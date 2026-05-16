@@ -1,0 +1,35 @@
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>Hello, {{ user.name }}!</h2>
+        <div style="text-align: right;">
+            <span style="font-size: 0.9rem; color: var(--text-muted);">Current Balance</span>
+            <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);">🪙 {{ user.token_balance }}</div>
+        </div>
+    </div>
+
+    <h3>Available Chores</h3>
+    <div style="display: grid; gap: 12px;">
+        {% for chore in chores %}
+        <div class="card" style="border: 1px solid #e5e7eb; padding: 16px; box-shadow: none;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h4 style="margin: 0;">{{ chore.title }}</h4>
+                    <p style="margin: 4px 0 0; font-size: 0.9rem; color: var(--text-muted);">{{ chore.description }}</p>
+                </div>
+                <div style="font-weight: 600; color: var(--primary);">+{{ chore.value_credits }}</div>
+            </div>
+            <button 
+                style="margin-top: 12px; padding: 8px; font-size: 0.9rem;"
+                hx-post="/api/verify-ui"
+                hx-vals='{"name": "{{ user.name }}", "pin": ""}'
+                hx-prompt="Enter PIN to complete:"
+                hx-target="#main-content"
+            >
+                Complete
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <button onclick="window.location.reload()" style="margin-top: 24px; background-color: var(--text-muted);">Logout / Switch User</button>
+</div>

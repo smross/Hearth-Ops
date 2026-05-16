@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2>Identify Yourself</h2>
+    <p style="color: var(--text-muted); margin-bottom: 24px;">Select your name and enter your 4-digit PIN.</p>
+    
+    <form id="verify-form" hx-post="/api/verify-ui" hx-target="#main-content">
+        <div class="form-group">
+            <label for="name">Family Member</label>
+            <select name="name" id="name" required>
+                <option value="" disabled selected>Select...</option>
+                {% for user in users %}
+                <option value="{{ user.name }}">{{ user.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="pin">4-Digit PIN</label>
+            <input type="password" name="pin" id="pin" maxlength="4" pattern="\d{4}" inputmode="numeric" required readonly placeholder="••••">
+            
+            <div class="pin-grid">
+                {% for i in range(1, 10) %}
+                <button type="button" class="pin-btn" onclick="addPin('{{ i }}')">{{ i }}</button>
+                {% endfor %}
+                <button type="button" class="pin-btn" onclick="clearPin()">C</button>
+                <button type="button" class="pin-btn" onclick="addPin('0')">0</button>
+                <button type="submit" style="background-color: var(--success);">GO</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    function addPin(num) {
+        const pinInput = document.getElementById('pin');
+        if (pinInput.value.length < 4) {
+            pinInput.value += num;
+        }
+    }
+    function clearPin() {
+        document.getElementById('pin').value = '';
+    }
+</script>
+{% endblock %}
