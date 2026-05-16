@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hearth-ops-backend
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/app
+      - ./frontend/templates:/app/templates
+      - ./frontend/static:/app/static
+      - data_storage:/app/data
+    environment:
+      - DATABASE_URL=sqlite:////app/data/hearth.db
+      - SECRET_KEY=${SECRET_KEY}
+      - APP_ENV=${APP_ENV:-production}
+    networks:
+      - hearth_net
+
+  pihole:
+    image: pihole/pihole:latest
+    container_name: hearth-ops-pihole
+    restart: unless-stopped
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "${PIHOLE_WEB_PORT:-8080}:80/tcp"
+    environment:
+      TZ: ${TZ:-America/Chicago}
+      WEBPASSWORD: ${PIHOLE_PASSWORD}
+    volumes:
+      - ./infrastructure/pihole/etc-pihole:/etc/pihole
+      - ./infrastructure/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
+    networks:
+      - hearth_net
+
+volumes:
+  data_storage:
+
+networks:
+  hearth_net:
+    driver: bridge

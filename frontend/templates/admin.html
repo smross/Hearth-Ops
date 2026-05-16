@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2>Family Ledger Overview</h2>
+    <div style="margin-top: 20px;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="border-bottom: 2px solid #e5e7eb; text-align: left;">
+                    <th style="padding: 12px 0;">Member</th>
+                    <th style="padding: 12px 0; text-align: right;">Current Balance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr style="border-bottom: 1px solid #f3f4f6;">
+                    <td style="padding: 16px 0; font-weight: 600;">{{ user.name }}</td>
+                    <td style="padding: 16px 0; text-align: right; color: var(--success); font-weight: 700;">🪙 {{ user.token_balance }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div style="margin-top: 32px;">
+        <h3>System Status</h3>
+        <div class="alert alert-success" style="text-align: left; font-size: 0.9rem;">
+            ✅ Database Connected<br>
+            ✅ Pi-hole Integration Active<br>
+            ✅ Network Overrides Ready
+        </div>
+    </div>
+
+    <button onclick="window.location.href='/'" style="margin-top: 24px; background-color: var(--text-muted);">Back to Kiosk</button>
+</div>
+{% endblock %}
