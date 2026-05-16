@@ -13,6 +13,7 @@ HearthOps is a self-hosted Docker monorepo that automates family routines, manag
 
 ## 📁 Repository Directory Structure
 
+```text
 hearth-ops/
 ├── .env.example             # Template for secure environment variables
 ├── .gitignore               # Multi-stack environment exclusion mapping
@@ -23,7 +24,8 @@ hearth-ops/
 │   └── requirements.txt     # Python dependencies
 ├── frontend/                # Lightweight HTMX and responsive CSS templates
 └── infrastructure/          # Local network utility provisions
-└── pihole/              # Persistent volume mounts for local blocklists
+    └── pihole/              # Persistent volume mounts for local blocklists
+```
 
 ---
 
