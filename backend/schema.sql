@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS chores (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     description TEXT,
+    category TEXT DEFAULT 'General', -- e.g., 'Kitchen', 'Bedroom', 'Yard', 'Personal'
+    frequency TEXT DEFAULT 'daily', -- 'daily', 'weekly', 'adhoc'
     assigned_user_id INTEGER,
     value_credits REAL NOT NULL DEFAULT 0.0,
     is_active INTEGER DEFAULT 1, -- 1=True, 0=False
@@ -32,7 +34,17 @@ CREATE TABLE IF NOT EXISTS chore_logs (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- 4. Multi-User Assignments Table
+CREATE TABLE IF NOT EXISTS chore_assignments (
+    chore_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    PRIMARY KEY (chore_id, user_id),
+    FOREIGN KEY (chore_id) REFERENCES chores(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Indexes for performance tuning and fast UI loads
 CREATE INDEX IF NOT EXISTS idx_users_name ON users(name);
 CREATE INDEX IF NOT EXISTS idx_chores_assigned ON chores(assigned_user_id);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON chore_logs(completed_at);
+CREATE INDEX IF NOT EXISTS idx_assignments_user ON chore_assignments(user_id);

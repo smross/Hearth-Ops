@@ -21,3 +21,15 @@ This file tracks the active deployment state of the HearthOps monorepo. Use this
 - [x] **Task 4.1:** Build the core base HTML shell utilizing an ultra-lightweight, mobile-first CSS architecture.
 - [x] **Task 4.2:** Construct the client validation form using HTMX endpoints to handle dynamic PIN entries, error responses, and live ledger balances without full-page reloads.
 - [x] **Task 4.3:** Formulate the read-only, split-screen administrative dashboard layout structured specifically for tablet kiosks.
+
+## 🟩 Phase 5: Docker Integration & Local Validation
+- [x] **Task 5.1:** Update `backend/main.py` to handle dynamic template/static paths for both local and container environments.
+- [x] **Task 5.2:** Refine `docker-compose.yml` volume mounts to preserve project directory structure.
+- [x] **Task 5.3:** Enhance `backend/seed.py` to include default chores and load environment variables from `.env`.
+- [x] **Task 5.4:** Verify the full "Identify" -> "Dashboard" -> "Complete Chore" loop locally.
+- [x] **Task 5.5:** Run `docker-compose up --build` to confirm the containerized environment is fully functional.
+
+## 🟩 Phase 6: Production Hardening & Feature Expansion (Next)
+- [ ] **Task 6.1:** Implement "Token Redemptions" (Rewards store) for kids to spend their earned credits.
+- [ ] **Task 6.2:** Configure Pi-hole API hooks to toggle internet access based on chore completion status.
+- [ ] **Task 6.3:** Add "Transaction History" view for kids to see their past earned/spent tokens.
