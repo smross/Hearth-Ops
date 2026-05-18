@@ -11,9 +11,8 @@ services:
       - "${APP_PORT:-8000}:8000"
     volumes:
       - ./backend:/app
-      - ./frontend/templates:/app/templates
-      - ./frontend/static:/app/static
-      - data_storage:/app/data
+      - ./frontend:/app/frontend
+      - ./data:/app/data
     environment:
       - DATABASE_URL=sqlite:////app/data/hearth.db
       - SECRET_KEY=${SECRET_KEY}

@@ -113,9 +113,48 @@ button:hover {
 .alert-error {
     background-color: #fee2e2;
     color: var(--error);
+    animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shake {
+    10%, 90% { transform: translate3d(-1px, 0, 0); }
+    20%, 80% { transform: translate3d(2px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+    40%, 60% { transform: translate3d(4px, 0, 0); }
 }
 
 .alert-success {
     background-color: #d1fae5;
     color: var(--success);
+}
+
+/* Silhouetted Admin Button (Subtle ghost look for touch) */
+.admin-silhouette {
+    position: fixed;
+    bottom: 12px;
+    right: 12px;
+    width: 44px; /* Slightly larger for easier touch */
+    height: 44px;
+    background-color: rgba(0,0,0,0.02); /* Very faint background */
+    border: 1px solid rgba(0,0,0,0.03); /* Very faint border */
+    color: #d1d5db; /* Slightly darker gray */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    border-radius: 12px;
+    transition: all 0.3s;
+    z-index: 1000;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.admin-silhouette:active {
+    background-color: rgba(0,0,0,0.08);
+    color: var(--text-muted);
+}
+
+.admin-silhouette svg {
+    width: 24px;
+    height: 24px;
+    opacity: 0.4; /* Slightly more visible */
 }

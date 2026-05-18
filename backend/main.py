@@ -31,8 +31,18 @@ app.add_middleware(
 )
 
 # Static Files & Templates
-templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# In Docker, main.py is in /app, and frontend is in /app/frontend
+# Locally, main.py is in backend/, and frontend is a sibling of backend/
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+if os.path.exists(os.path.join(CURRENT_DIR, "..", "frontend")):
+    # Local dev structure
+    FRONTEND_DIR = os.path.join(CURRENT_DIR, "..", "frontend")
+else:
+    # Docker or alternative structure where frontend might be a sibling in the same dir
+    FRONTEND_DIR = os.path.join(CURRENT_DIR, "frontend")
+
+templates = Jinja2Templates(directory=os.path.join(FRONTEND_DIR, "templates"))
+app.mount("/static", StaticFiles(directory=os.path.join(FRONTEND_DIR, "static")), name="static")
 
 # --- Models ---
 
@@ -65,16 +75,132 @@ async def index(request: Request):
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM users ORDER BY name")
         users = cursor.fetchall()
-    return templates.TemplateResponse("index.html", {"request": request, "users": users})
+    return templates.TemplateResponse(request, "index.html", {"users": users})
 
-@app.get("/admin", response_class=HTMLResponse)
-async def admin_dashboard(request: Request):
-    """Serves the read-only administrative dashboard."""
+@app.post("/api/admin-verify", response_class=HTMLResponse)
+async def admin_verify(request: Request):
+    """Verifies Admin PIN (Parent 1 or Parent 2) and returns the admin dashboard."""
+    pin = request.headers.get("HX-Prompt")
+    if not pin:
+        return HTMLResponse(content='<div class="alert alert-error">Admin PIN required.</div>')
+    
+    hashed_input = hash_pin(pin)
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT name, token_balance FROM users ORDER BY token_balance DESC")
+        # Only Parent 1 and Parent 2 can access admin
+        cursor.execute(
+            "SELECT name FROM users WHERE pin_hash = ? AND (name = 'Parent 1' OR name = 'Parent 2')",
+            (hashed_input,)
+        )
+        admin = cursor.fetchone()
+        
+        if not admin:
+            return HTMLResponse(content='<div class="alert alert-error">Access Denied.</div>')
+        
+        # Fetch data for admin dashboard
+        cursor.execute("SELECT id, name, token_balance FROM users ORDER BY token_balance DESC")
         users = cursor.fetchall()
-    return templates.TemplateResponse("admin.html", {"request": request, "users": users})
+        
+        cursor.execute("SELECT id, title, description, category, frequency, value_credits, is_active FROM chores ORDER BY category, title")
+        chores = cursor.fetchall()
+        
+        # Fetch assignments for each chore
+        chore_list = []
+        for chore in chores:
+            cursor.execute("SELECT user_id FROM chore_assignments WHERE chore_id = ?", (chore["id"],))
+            assigned_ids = [row["user_id"] for row in cursor.fetchall()]
+            chore_dict = dict(chore)
+            chore_dict["assigned_user_ids"] = assigned_ids
+            chore_list.append(chore_dict)
+        
+        return templates.TemplateResponse(request, "admin_snippet.html", {
+            "users": users,
+            "chores": chore_list
+        })
+
+@app.post("/api/admin/chores/toggle/{chore_id}", response_class=HTMLResponse)
+async def admin_toggle_chore(request: Request, chore_id: int):
+    """Toggles a chore's active status from the admin panel."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE chores SET is_active = 1 - is_active WHERE id = ?", (chore_id,))
+        conn.commit()
+        
+        # Return full admin refresh (simplified for now)
+        cursor.execute("SELECT id, name, token_balance FROM users ORDER BY token_balance DESC")
+        users = cursor.fetchall()
+        cursor.execute("SELECT id, title, description, category, frequency, value_credits, is_active FROM chores ORDER BY category, title")
+        chores = cursor.fetchall()
+        
+        chore_list = []
+        for chore in chores:
+            cursor.execute("SELECT user_id FROM chore_assignments WHERE chore_id = ?", (chore["id"],))
+            assigned_ids = [row["user_id"] for row in cursor.fetchall()]
+            chore_dict = dict(chore)
+            chore_dict["assigned_user_ids"] = assigned_ids
+            chore_list.append(chore_dict)
+            
+        return templates.TemplateResponse(request, "admin_snippet.html", {
+            "users": users,
+            "chores": chore_list,
+            "message": "Chore status updated."
+        })
+
+@app.post("/api/admin/chores/update", response_class=HTMLResponse)
+async def admin_update_chore(
+    request: Request, 
+    chore_id: int = Form(...), 
+    title: str = Form(...),
+    description: str = Form(...),
+    category: str = Form(...),
+    frequency: str = Form(...),
+    value_credits: float = Form(...),
+    assigned_user_ids: List[int] = Form([])
+):
+    """Updates all fields for a specific chore, including multi-user assignments."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute("BEGIN TRANSACTION;")
+            cursor.execute(
+                """
+                UPDATE chores 
+                SET title = ?, description = ?, category = ?, frequency = ?, value_credits = ? 
+                WHERE id = ?
+                """, 
+                (title, description, category, frequency, value_credits, chore_id)
+            )
+            
+            # Update Assignments: Clear old and insert new
+            cursor.execute("DELETE FROM chore_assignments WHERE chore_id = ?", (chore_id,))
+            for user_id in assigned_user_ids:
+                cursor.execute("INSERT INTO chore_assignments (chore_id, user_id) VALUES (?, ?)", (chore_id, user_id))
+            
+            conn.commit()
+            msg = f"Updated: {title}"
+        except Exception as e:
+            conn.rollback()
+            msg = f"Error: {str(e)}"
+        
+        # Refresh Admin View
+        cursor.execute("SELECT id, name, token_balance FROM users ORDER BY token_balance DESC")
+        users = cursor.fetchall()
+        cursor.execute("SELECT id, title, description, category, frequency, value_credits, is_active FROM chores ORDER BY category, title")
+        chores = cursor.fetchall()
+        
+        chore_list = []
+        for chore in chores:
+            cursor.execute("SELECT user_id FROM chore_assignments WHERE chore_id = ?", (chore["id"],))
+            assigned_ids = [row["user_id"] for row in cursor.fetchall()]
+            chore_dict = dict(chore)
+            chore_dict["assigned_user_ids"] = assigned_ids
+            chore_list.append(chore_dict)
+        
+        return templates.TemplateResponse(request, "admin_snippet.html", {
+            "users": users,
+            "chores": chore_list,
+            "message": msg
+        })
 
 @app.post("/api/verify-ui", response_class=HTMLResponse)
 async def verify_ui(request: Request, name: str = Form(...), pin: str = Form(...)):
@@ -90,19 +216,122 @@ async def verify_ui(request: Request, name: str = Form(...), pin: str = Form(...
         user = cursor.fetchone()
         
         if not user or user["pin_hash"] != hashed_input:
-            return HTMLResponse(
-                content='<div class="alert alert-error">Invalid PIN. Try again.</div>',
-                status_code=200
-            )
+            cursor.execute("SELECT name FROM users ORDER BY name")
+            users = cursor.fetchall()
+            return templates.TemplateResponse(request, "login_snippet.html", {
+                "users": users,
+                "selected_name": name,
+                "error": "Invalid PIN. Try again."
+            })
         
-        cursor.execute("SELECT id, title, description, value_credits FROM chores WHERE is_active = 1")
+        # Fetch chores and filter by assignments AND frequency/cooldown
+        # Logic: Show if (Unassigned OR Assigned to me) 
+        # AND (Frequency is 'adhoc' OR not done today for 'daily' OR not done 3x today for 'meal' OR not done this week for 'weekly')
+        cursor.execute(
+            """
+            SELECT c.id, c.title, c.description, c.category, c.frequency, c.value_credits 
+            FROM chores c
+            WHERE c.is_active = 1 
+            AND (
+                NOT EXISTS (SELECT 1 FROM chore_assignments WHERE chore_id = c.id)
+                OR EXISTS (SELECT 1 FROM chore_assignments WHERE chore_id = c.id AND user_id = ?)
+            )
+            AND (
+                c.frequency = 'adhoc'
+                OR (c.frequency = 'daily' AND NOT EXISTS (
+                    SELECT 1 FROM chore_logs 
+                    WHERE chore_id = c.id AND user_id = ? 
+                    AND date(completed_at) = date('now', 'localtime')
+                ))
+                OR (c.frequency = 'meal' AND (
+                    SELECT COUNT(*) FROM chore_logs 
+                    WHERE chore_id = c.id AND user_id = ? 
+                    AND date(completed_at) = date('now', 'localtime')
+                ) < 3)
+                OR (c.frequency = 'weekly' AND NOT EXISTS (
+                    SELECT 1 FROM chore_logs 
+                    WHERE chore_id = c.id AND user_id = ? 
+                    AND date(completed_at, 'weekday 0', '-7 days') = date('now', 'localtime', 'weekday 0', '-7 days')
+                ))
+            )
+            ORDER BY c.category, c.title
+            """,
+            (user["id"], user["id"], user["id"], user["id"])
+        )
         chores = cursor.fetchall()
         
-        return templates.TemplateResponse("dashboard_snippet.html", {
-            "request": request, 
+        return templates.TemplateResponse(request, "dashboard_snippet.html", {
             "user": user, 
             "chores": chores
         })
+
+@app.post("/api/chores/complete-ui", response_class=HTMLResponse)
+async def complete_chore_ui(
+    request: Request, 
+    chore_id: int = Form(...), 
+    user_id: int = Form(...)
+):
+    """Handles chore completion from the UI via HTMX prompt."""
+    pin = request.headers.get("HX-Prompt")
+    
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, pin_hash, token_balance FROM users WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
+        
+        cursor.execute(
+            """
+            SELECT c.id, c.title, c.description, c.category, c.frequency, c.value_credits 
+            FROM chores c
+            WHERE c.is_active = 1 
+            AND (
+                NOT EXISTS (SELECT 1 FROM chore_assignments WHERE chore_id = c.id)
+                OR EXISTS (SELECT 1 FROM chore_assignments WHERE chore_id = c.id AND user_id = ?)
+            )
+            ORDER BY c.category, c.title
+            """,
+            (user_id,)
+        )
+        chores = cursor.fetchall()
+
+        if not pin or hash_pin(pin) != user["pin_hash"]:
+            return templates.TemplateResponse(request, "dashboard_snippet.html", {
+                "user": user,
+                "chores": chores,
+                "error": "Invalid PIN. Completion failed."
+            })
+            
+        cursor.execute("SELECT value_credits, title FROM chores WHERE id = ? AND is_active = 1", (chore_id,))
+        chore = cursor.fetchone()
+        if not chore:
+            return templates.TemplateResponse(request, "dashboard_snippet.html", {
+                "user": user,
+                "chores": chores,
+                "error": "Chore not found."
+            })
+            
+        try:
+            cursor.execute("BEGIN TRANSACTION;")
+            cursor.execute("INSERT INTO chore_logs (chore_id, user_id) VALUES (?, ?)", (chore_id, user_id))
+            cursor.execute("UPDATE users SET token_balance = token_balance + ? WHERE id = ?", (chore["value_credits"], user_id))
+            conn.commit()
+            
+            # Refresh user data
+            cursor.execute("SELECT id, name, token_balance FROM users WHERE id = ?", (user_id,))
+            user = cursor.fetchone()
+            
+            return templates.TemplateResponse(request, "dashboard_snippet.html", {
+                "user": user, 
+                "chores": chores,
+                "message": f"Success! Earned {chore['value_credits']} credits."
+            })
+        except Exception as e:
+            conn.rollback()
+            return templates.TemplateResponse(request, "dashboard_snippet.html", {
+                "user": user,
+                "chores": chores,
+                "error": f"Error: {str(e)}"
+            })
 
 # --- JSON API Endpoints ---
 

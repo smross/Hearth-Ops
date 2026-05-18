@@ -7,29 +7,51 @@
         </div>
     </div>
 
-    <h3>Available Chores</h3>
-    <div style="display: grid; gap: 12px;">
-        {% for chore in chores %}
-        <div class="card" style="border: 1px solid #e5e7eb; padding: 16px; box-shadow: none;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <h4 style="margin: 0;">{{ chore.title }}</h4>
-                    <p style="margin: 4px 0 0; font-size: 0.9rem; color: var(--text-muted);">{{ chore.description }}</p>
+    {% if message %}
+    <div class="alert alert-success" style="margin-bottom: 20px;">
+        {{ message }}
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="alert alert-error" style="margin-bottom: 20px;">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <div style="display: grid; gap: 24px;">
+        {% set categories = chores | groupby('category') %}
+        {% for category, cat_chores in categories %}
+        <div>
+            <h3 style="margin-bottom: 12px; border-bottom: 2px solid #e5e7eb; padding-bottom: 4px;">{{ category }}</h3>
+            <div style="display: grid; gap: 12px;">
+                {% for chore in cat_chores %}
+                <div class="card" style="border: 1px solid #e5e7eb; padding: 16px; box-shadow: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <h4 style="margin: 0;">{{ chore.title }}</h4>
+                            <p style="margin: 4px 0 0; font-size: 0.9rem; color: var(--text-muted);">{{ chore.description }}</p>
+                            <span style="display: inline-block; margin-top: 8px; font-size: 0.75rem; background: #f3f4f6; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em;">
+                                {{ chore.frequency }}
+                            </span>
+                        </div>
+                        <div style="font-weight: 600; color: var(--primary);">+{{ chore.value_credits }}</div>
+                    </div>
+                    <button 
+                        style="margin-top: 12px; padding: 8px; font-size: 0.9rem;"
+                        hx-post="/api/chores/complete-ui"
+                        hx-vals='{"chore_id": "{{ chore.id }}", "user_id": "{{ user.id }}"}'
+                        hx-prompt="Enter PIN to complete:"
+                        hx-target="#main-content"
+                    >
+                        Complete
+                    </button>
                 </div>
-                <div style="font-weight: 600; color: var(--primary);">+{{ chore.value_credits }}</div>
+                {% endfor %}
             </div>
-            <button 
-                style="margin-top: 12px; padding: 8px; font-size: 0.9rem;"
-                hx-post="/api/verify-ui"
-                hx-vals='{"name": "{{ user.name }}", "pin": ""}'
-                hx-prompt="Enter PIN to complete:"
-                hx-target="#main-content"
-            >
-                Complete
-            </button>
         </div>
         {% endfor %}
     </div>
     
-    <button onclick="window.location.reload()" style="margin-top: 24px; background-color: var(--text-muted);">Logout / Switch User</button>
+    <button onclick="window.location.reload()" style="margin-top: 32px; background-color: var(--text-muted);">Logout / Switch User</button>
 </div>
