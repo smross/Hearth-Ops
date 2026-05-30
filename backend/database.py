@@ -19,26 +19,26 @@ DB_PATH = DATABASE_URL.replace("sqlite:///", "")
 def init_db():
     """
     Initializes the database if it doesn't exist by running the schema.sql script.
+    Always runs CREATE TABLE IF NOT EXISTS statements to ensure new schema tables are created.
     """
     db_dir = os.path.dirname(DB_PATH)
     if db_dir and not os.path.exists(db_dir):
         os.makedirs(db_dir, exist_ok=True)
         logger.info(f"Created database directory: {db_dir}")
 
-    if not os.path.exists(DB_PATH):
-        logger.info(f"Database not found at {DB_PATH}. Initializing with schema.sql...")
-        schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
-        
+    schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
+    if os.path.exists(schema_path):
+        logger.info(f"Ensuring schema tables are up to date using schema.sql on {DB_PATH}...")
         try:
             with sqlite3.connect(DB_PATH) as conn:
                 with open(schema_path, "r") as f:
                     conn.executescript(f.read())
-            logger.info("Database successfully initialized with schema.sql.")
+            logger.info("Database schema check/initialization completed successfully.")
         except Exception as e:
-            logger.error(f"Failed to initialize database: {e}")
+            logger.error(f"Failed to check/initialize database schema: {e}")
             raise
     else:
-        logger.info(f"Database found at {DB_PATH}. Skipping initialization.")
+        logger.error(f"Schema file not found at {schema_path}")
 
 @contextmanager
 def get_db_connection():

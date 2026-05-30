@@ -8,7 +8,7 @@
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
-    <div class="container">
+    <div class="container {% block container_class %}{% endblock %}">
         <header>
             <h1>🏠 HearthOps</h1>
         </header>
@@ -41,6 +41,12 @@
                     <button type="button" onclick="submitAdminPin()" style="background-color: var(--primary);">GO</button>
                 </div>
                 <button type="button" onclick="hideAdminModal()" style="margin-top: 16px; background: none; color: var(--text-muted); padding: 8px;">Cancel</button>
+        <!-- Screensaver Overlay to prevent burn-in -->
+        <div id="screensaver-overlay" class="overlay" style="background-color: rgba(0, 0, 0, 0.95); opacity: 0; display: none; transition: opacity 0.5s ease; z-index: 10000; cursor: pointer; flex-direction: column; align-items: center; justify-content: center;">
+            <div id="screensaver-content" style="text-align: center; animation: floatClock 25s infinite ease-in-out; color: rgba(255,255,255,0.85); user-select: none;">
+                <div id="screensaver-time" style="font-size: 5.5rem; font-weight: 200; letter-spacing: 2px; text-shadow: 0 4px 12px rgba(0,0,0,0.5);">12:00</div>
+                <div style="font-size: 1.1rem; color: #818cf8; margin-top: 12px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase;">🏠 HearthOps</div>
+                <p style="font-size: 0.85rem; color: rgba(255,255,255,0.35); margin-top: 24px;">Tap anywhere to wake up</p>
             </div>
         </div>
     </div>
@@ -71,16 +77,87 @@
             }
         }
 
-        // Celebrate Animation Trigger
+        // Timers management
+        let inactivityTimeout;
+        let screensaverTimeout;
+        let screensaverClockInterval;
+
+        function updateScreensaverTime() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const screensaverTime = document.getElementById('screensaver-time');
+            if (screensaverTime) {
+                screensaverTime.innerText = hours + ':' + minutes;
+            }
+        }
+
+        function showScreensaver() {
+            updateScreensaverTime();
+            const screensaverOverlay = document.getElementById('screensaver-overlay');
+            if (screensaverOverlay) {
+                screensaverOverlay.style.display = 'flex';
+                screensaverOverlay.offsetHeight; // Force reflow
+                screensaverOverlay.style.opacity = '1';
+            }
+            clearInterval(screensaverClockInterval);
+            screensaverClockInterval = setInterval(updateScreensaverTime, 30000);
+        }
+
+        function hideScreensaver() {
+            const screensaverOverlay = document.getElementById('screensaver-overlay');
+            if (screensaverOverlay && screensaverOverlay.style.display === 'flex') {
+                clearInterval(screensaverClockInterval);
+                screensaverOverlay.style.opacity = '0';
+                setTimeout(function() {
+                    screensaverOverlay.style.display = 'none';
+                }, 500);
+            }
+            resetTimers();
+        }
+
+        function resetTimers() {
+            clearTimeout(inactivityTimeout);
+            clearTimeout(screensaverTimeout);
+            
+            // 1. Inactivity sign-out (1 minute)
+            const verifyForm = document.getElementById('verify-form');
+            if (!verifyForm) {
+                inactivityTimeout = setTimeout(function() {
+                    const container = document.querySelector('.container');
+                    if (container) {
+                        container.classList.remove('wide');
+                    }
+                    window.location.href = '/';
+                }, 60000);
+            }
+
+            // 2. Screensaver activation (3 minutes = 180000ms)
+            screensaverTimeout = setTimeout(showScreensaver, 180000);
+        }
+
+        // Listen for all common user interaction events to reset timers
+        const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+        activityEvents.forEach(function(eventName) {
+            document.addEventListener(eventName, resetTimers, { passive: true, capture: true });
+        });
+
+        // Click on screensaver wakes it up
+        document.getElementById('screensaver-overlay').addEventListener('click', hideScreensaver);
+
+        // Celebrate Animation Trigger and reset timer after HTMX content swap
         document.body.addEventListener('htmx:afterSwap', function(evt) {
+            resetTimers();
             if (evt.detail.target.id === 'main-content') {
                 const alert = document.querySelector('.alert-success');
                 if (alert) {
                     alert.classList.add('celebrate');
-                    // Add confetti logic here later if desired
                 }
             }
         });
+
+        // Initialize on load
+        resetTimers();
     </script>
 </body>
 </html>

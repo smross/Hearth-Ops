@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
     name TEXT NOT NULL UNIQUE,
     pin_hash TEXT NOT NULL,
     token_balance REAL DEFAULT 0.0,
+    is_parent INTEGER DEFAULT 0, -- 1=Parent, 0=Child
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -22,6 +23,8 @@ CREATE TABLE IF NOT EXISTS chores (
     value_credits REAL NOT NULL DEFAULT 0.0,
     max_daily_completions INTEGER DEFAULT 1, -- 1 = default daily limit, adhoc/unlimited = large/999
     is_active INTEGER DEFAULT 1, -- 1=True, 0=False
+    is_required INTEGER DEFAULT 0, -- 1=Required, 0=Optional
+    is_shared INTEGER DEFAULT 0, -- 1=Shared/Public, 0=Assigned
     FOREIGN KEY (assigned_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
@@ -57,9 +60,33 @@ CREATE TABLE IF NOT EXISTS token_transactions (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- 6. Encouragements (Kudo / Boost Message System)
+CREATE TABLE IF NOT EXISTS encouragements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender_id INTEGER NOT NULL,
+    recipient_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    is_read INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    read_at TIMESTAMP,
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 7. Google Calendars Table (Secret iCal Feeds)
+CREATE TABLE IF NOT EXISTS google_calendars (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    ical_url TEXT NOT NULL,
+    color TEXT NOT NULL, -- Hex or css-compatible color
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for performance tuning and fast UI loads
 CREATE INDEX IF NOT EXISTS idx_users_name ON users(name);
 CREATE INDEX IF NOT EXISTS idx_chores_assigned ON chores(assigned_user_id);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON chore_logs(completed_at);
 CREATE INDEX IF NOT EXISTS idx_assignments_user ON chore_assignments(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_user ON token_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_encouragements_recipient ON encouragements(recipient_id);
+

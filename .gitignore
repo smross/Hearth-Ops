@@ -180,3 +180,7 @@ ehthumbs_vista.db
 .idea/
 *.swp
 *.swo
+
+# Local Configuration (Anonymization helper)
+family_members.json
+backend/family_members.json

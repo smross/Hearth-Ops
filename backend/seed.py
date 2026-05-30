@@ -14,12 +14,11 @@ def hash_pin(pin: str) -> str:
 
 # Family members and their 4-digit PINs
 FAMILY_MEMBERS = [
-    {"name": "Parent 1", "pin": "3157"},
-    {"name": "Parent 2", "pin": "9019"},
-    {"name": "Child 3", "pin": "0129"},
-    {"name": "Child 1", "pin": "1019"},
-    {"name": "Child 2", "pin": "0404"},
-    {"name": "Child 4", "pin": "0924"},
+    {"name": "Parent 1", "pin": "1234", "is_parent": 1},
+    {"name": "Parent 2", "pin": "5678", "is_parent": 1},
+    {"name": "Child 1", "pin": "1111", "is_parent": 0},
+    {"name": "Child 2", "pin": "2222", "is_parent": 0},
+    {"name": "Child 3", "pin": "3333", "is_parent": 0},
 ]
 
 # Enhanced Chore List
@@ -60,10 +59,11 @@ DEFAULT_CHORES = [
     
     # Yardwork
     {"title": "Yard Cleanup", "desc": "Pull weeds and cleanup debris outside.", "cat": "Yard", "freq": "adhoc", "val": 10},
-    {"title": "Lawn Maintenance", "desc": "Full mow and trim of the yard.", "cat": "Yard", "freq": "weekly", "val": 15},
+    {"title": "Mow Lawn", "desc": "Mow the yard to the specified height.", "cat": "Yard", "freq": "weekly", "val": 8},
+    {"title": "Trim Edges", "desc": "Trim along fences, beds, and walks.", "cat": "Yard", "freq": "weekly", "val": 7},
 
     # Personal Care (Often Assigned)
-    {"title": "Make Your Bed", "desc": "Tidy sheets, fluff pillows, and straighten the comforter.", "cat": "Personal", "freq": "daily", "val": 2},
+    {"title": "Make Your Bed", "desc": "Tidy sheets, fluff pillows, and straighten the comforter.", "cat": "Personal", "freq": "daily", "val": 2, "is_required": 1, "is_shared": 1},
     {"title": "Tidy Your Bedroom", "desc": "Pickup toys/clothes and clear the floor surfaces.", "cat": "Personal", "freq": "daily", "val": 5},
     {"title": "Personal Care: Shower", "desc": "Complete your daily shower.", "cat": "Personal", "freq": "daily", "val": 2},
 ]
@@ -79,15 +79,34 @@ def seed_database():
     
     init_db()
 
+    # Load family members list (supports local anonymized config override)
+    import json
+    family_members = FAMILY_MEMBERS
+    config_paths = [
+        "family_members.json",
+        os.path.join(os.path.dirname(__file__), "family_members.json"),
+        "/app/family_members.json",
+        "/app/backend/family_members.json"
+    ]
+    for path in config_paths:
+        if os.path.exists(path):
+            try:
+                with open(path, "r") as f:
+                    family_members = json.load(f)
+                logger.info(f"Loaded custom family members configuration from {path}")
+                break
+            except Exception as e:
+                logger.error(f"Error loading custom configuration {path}: {e}")
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             
             # Seed Users
-            for member in FAMILY_MEMBERS:
+            for member in family_members:
                 cursor.execute(
-                    "INSERT INTO users (name, pin_hash) VALUES (?, ?)",
-                    (member["name"], hash_pin(member["pin"]))
+                    "INSERT INTO users (name, pin_hash, is_parent) VALUES (?, ?, ?)",
+                    (member["name"], hash_pin(member["pin"]), member["is_parent"])
                 )
                 logger.info(f"Seeded user: {member['name']}")
             
@@ -102,13 +121,16 @@ def seed_database():
                         max_comp = 3
                     else:
                         max_comp = 1
+                
+                is_req = chore.get("is_required", 0)
+                is_sh = chore.get("is_shared", 0)
                         
                 cursor.execute(
                     """
-                    INSERT INTO chores (title, description, category, frequency, value_credits, max_daily_completions) 
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO chores (title, description, category, frequency, value_credits, max_daily_completions, is_required, is_shared) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (chore["title"], chore["desc"], chore["cat"], chore["freq"], chore["val"], max_comp)
+                    (chore["title"], chore["desc"], chore["cat"], chore["freq"], chore["val"], max_comp, is_req, is_sh)
                 )
                 logger.info(f"Seeded chore: {chore['title']}")
 

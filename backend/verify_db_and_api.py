@@ -21,20 +21,20 @@ def test_database_and_pin_hashing():
         cursor.execute("SELECT id, name, pin_hash, token_balance FROM users")
         users = cursor.fetchall()
         print(f"Found {len(users)} users:")
-        shawn_found = False
+        parent_found = False
         for user in users:
             print(f" - ID: {user['id']}, Name: {user['name']}, Token Balance: {user['token_balance']}")
             if user['name'] == 'Parent 1':
-                shawn_found = True
-                # Parent 1's expected PIN is 3157
-                expected_hash = hash_pin("3157")
+                parent_found = True
+                # Parent 1's expected PIN is 1234
+                expected_hash = hash_pin("1234")
                 if user['pin_hash'] == expected_hash:
                     print("   [PASS] PIN hash matches expected SHA-256 hash for Parent 1.")
                 else:
                     print(f"   [FAIL] Hash mismatch for Parent 1. Got {user['pin_hash']}, expected {expected_hash}")
                     sys.exit(1)
         
-        if not shawn_found:
+        if not parent_found:
             print("Error: Parent 1 not found in database users.")
             sys.exit(1)
 
@@ -65,7 +65,7 @@ def test_api_routing_internally():
             sys.exit(1)
 
         # Test verify endpoint (valid pin)
-        response = client.post("/api/verify", json={"name": "Parent 1", "pin": "3157"})
+        response = client.post("/api/verify", json={"name": "Parent 1", "pin": "1234"})
         if response.status_code == 200:
             user_data = response.json()
             print(f"[PASS] TestClient POST /api/verify succeeded for Parent 1 (ID: {user_data.get('id')}).")
@@ -104,7 +104,7 @@ def test_api_routing_internally():
         try:
             req = urllib.request.Request(
                 "http://localhost:8000/api/verify",
-                data=json.dumps({"name": "Parent 1", "pin": "3157"}).encode(),
+                data=json.dumps({"name": "Parent 1", "pin": "1234"}).encode(),
                 headers={"Content-Type": "application/json"}
             )
             with urllib.request.urlopen(req) as r:

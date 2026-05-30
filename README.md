@@ -1,13 +1,19 @@
 # HearthOps
 
-HearthOps is a self-hosted Docker monorepo that automates family routines, manages an ADHD-friendly token economy, and enforces network accountability. Built with FastAPI and SQLite for a local server and tablet kiosk, it replaces parental nagging with immediate dopamine feedback loops and secure remote overrides.
+HearthOps is a self-hosted monorepo that automates family routines, manages a token-based chore economy, and supports local calendar synchronization. Built with FastAPI, HTMX, and SQLite, it is designed to run in a containerized Docker environment for local network dashboarding, tablet kiosks, or phone-based chore validation.
 
-## 🖥️ System Architecture
+For directions on customizing family profiles, managing chores, and linking Google Calendars, see the [Administration Guide](file:///C:/Users/sgtse/SourceCode/Hearth-Ops/ADMINISTRATION_GUIDE.md).
 
-* **Core Server (ThinkPad T440s):** Runs a headless Linux environment hosting the core Docker containers. Its internal battery acts as an automatic hardware UPS to maintain database integrity during unexpected power fluctuations.
-* **Command Center (13-Inch iPad):** Positioned on the kitchen island as a high-utility family hub. Hardened via Apple **Guided Access** to a single local browser window and entirely isolated from WAN access at the router level for enhanced platform security.
-* **Validation Terminals:** Personal smartphones (including a SIM-less Wi-Fi device for the youngest child) running a mobile-responsive interface for secure task clearance using unique 4-digit PINs.
-* **Remote Administration:** Managed exclusively from parental mobile devices over a secure **Tailscale** mesh network, completely bypassing the need to install orchestration software on corporate workstations.
+---
+
+## 🖥️ Architecture & Deployment Ideas
+
+HearthOps is highly flexible and can be adapted to various home server setups:
+
+*   **Core Server:** Typically hosted on a local server, single-board computer, or older laptop (which offers a built-in battery backup) running Docker.
+*   **Command Center Kiosk:** Often displayed on a kitchen tablet or shared screen. Using tablet kiosk features (like Guided Access on iOS) locks the interface to the local dashboard window.
+*   **Validation Terminals:** Family members' mobile phones or local Wi-Fi devices can access the responsive interface to enter their unique 4-digit PIN and check off chores.
+*   **Remote Administration:** Access to the admin console can be secured using local access rules or a private VPN mesh network (like Tailscale) for secure parental override.
 
 ---
 
@@ -18,6 +24,7 @@ hearth-ops/
 ├── .env.example             # Template for secure environment variables
 ├── .gitignore               # Multi-stack environment exclusion mapping
 ├── docker-compose.yml       # Local multi-container deployment configuration
+├── ADMINISTRATION_GUIDE.md  # How to configure family users, chores, and calendars
 ├── backend/                 # Python/FastAPI Core Application Engine
 │   ├── main.py              # API endpoint routing and verification logic
 │   ├── database.py          # SQLite connection and migration engine
@@ -31,5 +38,5 @@ hearth-ops/
 
 ## 🔒 Security & Data Integrity
 
-* **Zero-Cloud PII:** Family identities, performance histories, and ledger transaction accounts are strictly maintained inside the internal containerized SQLite instance over the local area network.
-* **Credential Isolation:** All developer access parameters and system tokens must reside exclusively inside a root-protected `.env` runtime context. Standard application logging is configured to explicitly suppress environment configurations from flat-text outputs.
+*   **Zero-Cloud PII:** Family identities, performance histories, and ledger transaction accounts are strictly maintained inside the local SQLite database.
+*   **Credential Isolation:** System configurations, passwords, and calendar links reside inside a local `.env` runtime context to protect private data.
