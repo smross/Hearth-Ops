@@ -5,7 +5,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: hearth-ops-backend
+    container_name: hearth-ops-${APP_ENV:-production}-backend
     restart: unless-stopped
     ports:
       - "${APP_PORT:-8000}:8000"
