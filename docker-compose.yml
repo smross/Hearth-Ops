@@ -20,27 +20,7 @@ services:
     networks:
       - hearth_net
 
-  pihole:
-    image: pihole/pihole:latest
-    container_name: hearth-ops-pihole
-    restart: unless-stopped
-    ports:
-      - "192.168.4.146:53:53/tcp"
-      - "192.168.4.146:53:53/udp"
-      - "[2600:6c40:7d00:656:818d:a79e:92d7:b1d2]:53:53/tcp"
-      - "[2600:6c40:7d00:656:818d:a79e:92d7:b1d2]:53:53/udp"
-      - "${PIHOLE_WEB_PORT:-8080}:80/tcp"
-    environment:
-      TZ: ${TZ:-America/Chicago}
-      WEBPASSWORD: ${PIHOLE_PASSWORD}
-      DNSMASQ_LISTENING: all
-      PIHOLE_DNS_1: 8.8.8.8
-      PIHOLE_DNS_2: 8.8.4.4
-    volumes:
-      - ./infrastructure/pihole/etc-pihole:/etc/pihole
-      - ./infrastructure/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
-    networks:
-      - hearth_net
+
 
 volumes:
   data_storage:
