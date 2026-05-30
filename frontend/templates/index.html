@@ -1,5 +1,43 @@
 {% extends "base.html" %}
 
 {% block content %}
-    {% include "login_snippet.html" %}
+<!-- Running Ticker showing last 5 chores completed today or dad jokes -->
+<div class="ticker-wrap" style="background: #eef2ff; border-radius: 8px; padding: 8px 12px; margin-bottom: 20px; font-size: 0.85rem; border-left: 4px solid var(--primary); display: flex; align-items: center; gap: 8px; overflow: hidden;">
+    <span style="font-weight: 700; color: var(--primary); white-space: nowrap; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;">📢 Hearth:</span>
+    <marquee scrollamount="5" style="margin: 0; color: #374151;">
+        {% if ticker %}
+            {% for item in ticker %}
+            <span style="margin-right: 24px;">🎉 <strong>{{ item.name }}</strong> did <em>{{ item.title }}</em> at {{ item.time_str }}</span>
+            {% endfor %}
+        {% else %}
+            {% set quotes = [
+                "Why did the chore go to school? To clean up its act!",
+                "Carpe Diem! A clean room is a clear mind. Which chore is next?",
+                "What did the broom say to the vacuum? I'm so swept away by your work ethic!",
+                "Every chore completed is a step closer to legendary status.",
+                "Why did the dust bunny cross the road? To escape your cleaning skills!",
+                "Cleanliness is next to... earning more tokens!",
+                "Choose your chore, build your routine, earn your reward!",
+                "What kind of head has no brain? A head of lettuce! Eat your veggies after chores!",
+                "Why did the computer squeak? Because someone used a mouse! Clean your desk!",
+                "Did you hear about the math teacher who was afraid of negative numbers? He'll stop at nothing to avoid them!",
+                "The secret of getting ahead is getting started. Tackle a routine now!",
+                "A little progress each day adds up to big results.",
+                "Keep going! You're doing amazing helper work today.",
+                "Teamwork makes the dream work. Help your family out today!",
+                "What did one plate say to the other? Dinner is on me! Let's wipe the dining table!",
+                "Your bed is a canvas, and you are the artist. Make it beautiful!",
+                "Why did the sponge cross the sink? To get to the clean side!",
+                "Work hard in silence, let your token balance make the noise!",
+                "You can do it! Small habits lead to giant successes.",
+                "Clean space, happy pace! Let's make it shine today!"
+            ] | shuffle %}
+            {% for q in quotes[:5] %}
+            <span style="margin-right: 48px;">✨ <strong>{{ q }}</strong></span>
+            {% endfor %}
+        {% endif %}
+    </marquee>
+</div>
+
+{% include "login_snippet.html" %}
 {% endblock %}

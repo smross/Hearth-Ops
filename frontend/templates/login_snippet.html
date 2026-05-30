@@ -1,42 +1,64 @@
 <div class="card">
-    <h2>Identify Yourself</h2>
-    <p style="color: var(--text-muted); margin-bottom: 24px;">Select your name and enter your 4-digit PIN.</p>
+    <h2 style="text-align: center; margin-bottom: 8px;">Identify Yourself</h2>
+    <p style="color: var(--text-muted); text-align: center; margin-bottom: 32px;">Choose your name and enter your 4-digit PIN.</p>
     
     {% if error %}
-    <div class="alert alert-error" style="margin-bottom: 20px;">
+    <div class="alert alert-error" style="margin-bottom: 24px;">
         {{ error }}
     </div>
     {% endif %}
 
     <form id="verify-form" hx-post="/api/verify-ui" hx-target="#main-content">
-        <div class="form-group">
-            <label for="name">Family Member</label>
-            <select name="name" id="name" required>
-                <option value="" disabled {% if not selected_name %}selected{% endif %}>Select...</option>
+        <input type="hidden" name="name" id="selected-name" value="{{ selected_name or '' }}">
+        
+        <div style="margin-bottom: 32px;">
+            <label style="display: block; text-align: center; margin-bottom: 16px; color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Family Member</label>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 12px;">
                 {% for user in users %}
-                <option value="{{ user.name }}" {% if selected_name == user.name %}selected{% endif %}>{{ user.name }}</option>
+                <button type="button" 
+                        class="member-select-btn {% if selected_name == user.name %}selected{% endif %}"
+                        onclick="selectMember(this, '{{ user.name }}')"
+                        style="padding: 16px 8px; font-size: 1rem; background: #fff; border: 2px solid #e5e7eb; color: var(--text); border-radius: 12px; cursor: pointer; transition: all 0.2s;">
+                    {{ user.name }}
+                </button>
                 {% endfor %}
-            </select>
+            </div>
         </div>
 
-        <div class="form-group">
-            <label for="pin">4-Digit PIN</label>
-            <input type="password" name="pin" id="pin" maxlength="4" pattern="\d{4}" inputmode="numeric" required readonly placeholder="••••">
+        <div class="form-group" style="max-width: 320px; margin: 0 auto;">
+            <label for="pin" style="display: block; text-align: center; color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">4-Digit PIN</label>
+            <input type="password" name="pin" id="pin" maxlength="4" pattern="\d{4}" inputmode="numeric" required readonly placeholder="••••" 
+                   style="text-align: center; font-size: 2rem; letter-spacing: 0.5rem; height: 60px; margin-bottom: 16px;">
             
             <div class="pin-grid">
                 {% for i in range(1, 10) %}
                 <button type="button" class="pin-btn" onclick="addPin('{{ i }}')">{{ i }}</button>
                 {% endfor %}
-                <button type="button" class="pin-btn" onclick="clearPin()">C</button>
+                <button type="button" class="pin-btn" onclick="clearPin()" style="color: var(--error);">C</button>
                 <button type="button" class="pin-btn" onclick="addPin('0')">{{ 0 }}</button>
-                <button type="submit" style="background-color: var(--success);">GO</button>
+                <button type="submit" style="background-color: var(--success); font-size: 1.2rem;">GO</button>
             </div>
         </div>
     </form>
 </div>
 
 <script>
-    if (typeof addPin !== 'function') {
+    if (typeof selectMember !== 'function') {
+        function selectMember(btn, name) {
+            // Update hidden input
+            document.getElementById('selected-name').value = name;
+            
+            // Update visual state
+            document.querySelectorAll('.member-select-btn').forEach(b => {
+                b.style.borderColor = '#e5e7eb';
+                b.style.backgroundColor = '#fff';
+                b.style.color = 'var(--text)';
+            });
+            btn.style.borderColor = 'var(--primary)';
+            btn.style.backgroundColor = 'var(--bg)';
+            btn.style.color = 'var(--primary)';
+        }
+
         function addPin(num) {
             const pinInput = document.getElementById('pin');
             if (pinInput.value.length < 4) {

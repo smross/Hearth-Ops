@@ -22,6 +22,11 @@ body {
 .container {
     width: 100%;
     max-width: 600px;
+    transition: max-width 0.2s ease;
+}
+
+.container.wide {
+    max-width: 1000px;
 }
 
 header {
@@ -77,9 +82,13 @@ button {
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
-button:hover {
+button:hover, button:active {
     background-color: var(--primary-hover);
 }
 
@@ -97,9 +106,14 @@ button:hover {
     border: 2px solid #e5e7eb;
     border-radius: 12px;
     font-size: 1.5rem;
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.pin-btn:active {
+.pin-btn:active, .pin-btn:hover {
     background-color: #e5e7eb;
 }
 
@@ -153,8 +167,184 @@ button:hover {
     color: var(--text-muted);
 }
 
-.admin-silhouette svg {
-    width: 24px;
-    height: 24px;
-    opacity: 0.4; /* Slightly more visible */
+/* Accordion Styles */
+details {
+    background: var(--card-bg);
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: all 0.2s ease;
 }
+
+details[open] {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+summary {
+    padding: 16px;
+    font-weight: 700;
+    font-size: 1.1rem;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+}
+
+summary::-webkit-details-marker {
+    display: none;
+}
+
+summary::after {
+    content: "＋";
+    font-size: 1.2rem;
+    color: var(--text-muted);
+}
+
+details[open] summary::after {
+    content: "－";
+}
+
+summary:hover {
+    background-color: #f9fafb;
+}
+
+.chore-item {
+    border-top: 1px solid #f3f4f6;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.chore-info {
+    flex-grow: 1;
+}
+
+.chore-title {
+    font-weight: 600;
+    margin: 0;
+    font-size: 1rem;
+}
+
+.chore-desc {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.chore-badge {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 0.7rem;
+    background: #f3f4f6;
+    color: var(--text-muted);
+    padding: 2px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.chore-value {
+    font-weight: 700;
+    color: var(--primary);
+    white-space: nowrap;
+}
+
+.chore-action-btn {
+    width: auto;
+    padding: 10px 20px;
+    font-size: 0.9rem;
+    border-radius: 8px;
+}
+
+/* Category Specific Colors */
+details.cat-kitchen { border-left: 4px solid #f59e0b; }
+details.cat-bedroom { border-left: 4px solid #3b82f6; }
+details.cat-bathroom { border-left: 4px solid #10b981; }
+details.cat-living { border-left: 4px solid #8b5cf6; }
+details.cat-outside { border-left: 4px solid #ef4444; }
+/* Modal / Overlay */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    backdrop-filter: blur(4px);
+}
+
+.overlay.active {
+    display: flex;
+}
+
+.modal {
+    background: var(--card-bg);
+    padding: 24px;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 360px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Completion Animation */
+@keyframes celebrate {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); background-color: #d1fae5; }
+    100% { transform: scale(1); }
+}
+
+.celebrate {
+    animation: celebrate 0.5s ease-out;
+}
+
+/* Category Icons Helper */
+/* Progress Bar */
+.progress-container {
+    height: 12px;
+    background-color: #e5e7eb;
+    border-radius: 999px;
+    margin: 8px 0 20px 0;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--success));
+    transition: width 0.5s ease-out;
+}
+
+/* Leaderboard */
+.leaderboard-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.leaderboard-rank {
+    font-weight: 800;
+    color: var(--text-muted);
+    width: 24px;
+}
+
+.leaderboard-name {
+    flex-grow: 1;
+    font-weight: 600;
+}
+
+.leaderboard-score {
+    font-weight: 700;
+    color: var(--success);
+}
+
+

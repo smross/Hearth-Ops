@@ -25,17 +25,17 @@ FAMILY_MEMBERS = [
 # Enhanced Chore List
 DEFAULT_CHORES = [
     # Kitchen & Meals
-    {"title": "Clear Your Meal Place", "desc": "Bring all your dishes to the sink and rinse them.", "cat": "Kitchen", "freq": "daily", "val": 2},
-    {"title": "Wipe Dining Table", "desc": "Clear crumbs and wipe the table surface clean.", "cat": "Kitchen", "freq": "daily", "val": 2},
-    {"title": "Clean Under Chair", "desc": "Ensure no food or mess is left on the floor after eating.", "cat": "Kitchen", "freq": "daily", "val": 2},
-    {"title": "Morning Kitchen Reset", "desc": "Empty the dishwasher and clear the drying rack.", "cat": "Kitchen", "freq": "daily", "val": 5},
-    {"title": "Evening Kitchen Reset", "desc": "Empty dishwasher/drying rack to prep for dinner.", "cat": "Kitchen", "freq": "daily", "val": 5},
-    {"title": "Clean Kitchen Island", "desc": "Remove clutter and wipe down the island surface.", "cat": "Kitchen", "freq": "daily", "val": 3},
-    {"title": "Chef Duty: Dinner", "desc": "Prepare and serve the family meal.", "cat": "Kitchen", "freq": "daily", "val": 10},
-    {"title": "Load Dishwasher", "desc": "Load all dirty dishes and start the wash cycle.", "cat": "Kitchen", "freq": "daily", "val": 5},
-    {"title": "Hand Wash Dishes", "desc": "Wash items that can't go in the dishwasher.", "cat": "Kitchen", "freq": "daily", "val": 8},
-    {"title": "Wipe Main Counters", "desc": "Clear all items and sanitize kitchen countertops.", "cat": "Kitchen", "freq": "daily", "val": 4},
-    {"title": "Store Leftovers", "desc": "Pack food into containers and place in the fridge.", "cat": "Kitchen", "freq": "daily", "val": 2},
+    {"title": "Clear Your Meal Place", "desc": "Bring all your dishes to the sink and rinse them.", "cat": "Kitchen", "freq": "daily", "val": 2, "max_comp": 1},
+    {"title": "Wipe Dining Table", "desc": "Clear crumbs and wipe the table surface clean.", "cat": "Kitchen", "freq": "daily", "val": 2, "max_comp": 1},
+    {"title": "Clean Under Chair", "desc": "Ensure no food or mess is left on the floor after eating.", "cat": "Kitchen", "freq": "daily", "val": 2, "max_comp": 1},
+    {"title": "Unload dishwasher+clear drying rack", "desc": "Empty the dishwasher and clear the drying rack.", "cat": "Kitchen", "freq": "daily", "val": 5, "max_comp": 1},
+    {"title": "Evening Kitchen Reset", "desc": "Empty dishwasher/drying rack to prep for dinner.", "cat": "Kitchen", "freq": "daily", "val": 5, "max_comp": 1},
+    {"title": "Clean Kitchen Island", "desc": "Remove clutter and wipe down the island surface.", "cat": "Kitchen", "freq": "daily", "val": 3, "max_comp": 1},
+    {"title": "Chef Duty: Dinner", "desc": "Prepare and serve the family meal.", "cat": "Kitchen", "freq": "daily", "val": 10, "max_comp": 1},
+    {"title": "Load Dishwasher", "desc": "Load all dirty dishes and start the wash cycle.", "cat": "Kitchen", "freq": "daily", "val": 5, "max_comp": 1},
+    {"title": "Hand Wash Dishes", "desc": "Wash items that can't go in the dishwasher.", "cat": "Kitchen", "freq": "daily", "val": 8, "max_comp": 1},
+    {"title": "Wipe Main Counters", "desc": "Clear all items and sanitize kitchen countertops.", "cat": "Kitchen", "freq": "daily", "val": 4, "max_comp": 1},
+    {"title": "Store Leftovers", "desc": "Pack food into containers and place in the fridge.", "cat": "Kitchen", "freq": "daily", "val": 2, "max_comp": 1},
     
     # Cleaning & Tidy
     {"title": "Break Down Boxes", "desc": "Flatten cardboard boxes for recycling.", "cat": "Cleaning", "freq": "adhoc", "val": 5},
@@ -93,12 +93,22 @@ def seed_database():
             
             # Seed Chores
             for chore in DEFAULT_CHORES:
+                # Default max_daily_completions to 999 for adhoc, or 1 for daily/weekly, or 3 for meal (if any exist)
+                max_comp = chore.get("max_comp")
+                if max_comp is None:
+                    if chore["freq"] == "adhoc":
+                        max_comp = 999
+                    elif chore["freq"] == "meal":
+                        max_comp = 3
+                    else:
+                        max_comp = 1
+                        
                 cursor.execute(
                     """
-                    INSERT INTO chores (title, description, category, frequency, value_credits) 
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO chores (title, description, category, frequency, value_credits, max_daily_completions) 
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    (chore["title"], chore["desc"], chore["cat"], chore["freq"], chore["val"])
+                    (chore["title"], chore["desc"], chore["cat"], chore["freq"], chore["val"], max_comp)
                 )
                 logger.info(f"Seeded chore: {chore['title']}")
 

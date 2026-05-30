@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS chores (
     frequency TEXT DEFAULT 'daily', -- 'daily', 'weekly', 'adhoc'
     assigned_user_id INTEGER,
     value_credits REAL NOT NULL DEFAULT 0.0,
+    max_daily_completions INTEGER DEFAULT 1, -- 1 = default daily limit, adhoc/unlimited = large/999
     is_active INTEGER DEFAULT 1, -- 1=True, 0=False
     FOREIGN KEY (assigned_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
@@ -29,6 +30,8 @@ CREATE TABLE IF NOT EXISTS chore_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chore_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
+    action_type TEXT DEFAULT 'earn', -- 'earn', 'undo'
+    credits_delta REAL NOT NULL DEFAULT 0.0,
     completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (chore_id) REFERENCES chores(id),
     FOREIGN KEY (user_id) REFERENCES users(id)
@@ -43,8 +46,20 @@ CREATE TABLE IF NOT EXISTS chore_assignments (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- 5. Token Transactions (Rewards / Manual Adjustment Ledger)
+CREATE TABLE IF NOT EXISTS token_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    amount REAL NOT NULL, -- negative for spend, positive for adjustment
+    category TEXT NOT NULL, -- 'spend', 'adjust'
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Indexes for performance tuning and fast UI loads
 CREATE INDEX IF NOT EXISTS idx_users_name ON users(name);
 CREATE INDEX IF NOT EXISTS idx_chores_assigned ON chores(assigned_user_id);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON chore_logs(completed_at);
 CREATE INDEX IF NOT EXISTS idx_assignments_user ON chore_assignments(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_user ON token_transactions(user_id);
