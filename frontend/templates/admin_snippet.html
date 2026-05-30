@@ -1,10 +1,15 @@
 <script>
-    // Restore scroll position after HTMX swap
+    // Restore scroll position after HTMX swap and expand layout for widescreen view
     (function() {
         var scrollY = window.sessionStorage.getItem('adminScroll');
         if (scrollY !== null) {
             window.scrollTo(0, parseInt(scrollY));
             window.sessionStorage.removeItem('adminScroll');
+        }
+        // Expand the container layout for admin ease of use
+        const container = document.querySelector('.container');
+        if (container) {
+            container.classList.add('wide');
         }
     })();
 </script>
@@ -12,7 +17,7 @@
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
         <h2>Admin Console</h2>
-        <button onclick="window.location.reload()" style="width: auto; padding: 8px 16px; background-color: var(--text-muted);">Exit Admin</button>
+        <button onclick="document.querySelector('.container')?.classList.remove('wide'); window.location.reload();" style="width: auto; padding: 8px 16px; background-color: var(--text-muted);">Exit Admin</button>
     </div>
 
     {% if message %}
@@ -20,100 +25,169 @@
     {% endif %}
 
     <div style="margin-bottom: 32px;">
-        <h3>Family Ledger</h3>
+        <h3>Family Ledger & Account Actions</h3>
         <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
             <thead>
                 <tr style="border-bottom: 2px solid #e5e7eb; text-align: left;">
-                    <th style="padding: 12px 0;">Member</th>
-                    <th style="padding: 12px 0; text-align: right;">Balance</th>
+                    <th style="padding: 12px 8px; width: 15%;">Member</th>
+                    <th style="padding: 12px 8px; text-align: right; width: 15%;">Balance</th>
+                    <th style="padding: 12px 8px; text-align: right; width: 35%;">Adjust Credits</th>
+                    <th style="padding: 12px 8px; text-align: right; width: 35%;">Account Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for user in users %}
                 <tr style="border-bottom: 1px solid #f3f4f6;">
-                    <td style="padding: 12px 0; font-weight: 600;">{{ user.name }}</td>
-                    <td style="padding: 12px 0; text-align: right; color: var(--success); font-weight: 700;">🪙 {{ user.token_balance }}</td>
+                    <td style="padding: 12px 8px; font-weight: 600;">{{ user.name }}</td>
+                    <td style="padding: 12px 8px; text-align: right; color: var(--success); font-weight: 700; white-space: nowrap;">🪙 {{ user.token_balance }}</td>
+                    <td style="padding: 12px 8px; text-align: right;">
+                        <!-- Inline adjust credits form -->
+                        <form hx-post="/api/admin/ledger/adjust" hx-target="#main-content" style="display: inline-flex; gap: 4px; justify-content: flex-end; width: 100%;" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
+                            <input type="hidden" name="user_id" value="{{ user.id }}">
+                            <input type="number" name="amount" placeholder="+/- value" step="0.5" required style="width: 80px; padding: 4px 8px; font-size: 0.85rem; height: 36px;">
+                            <input type="text" name="description" placeholder="Reason" style="width: 120px; padding: 4px 8px; font-size: 0.85rem; height: 36px;">
+                            <button type="submit" style="width: auto; padding: 4px 12px; font-size: 0.85rem; height: 36px; background-color: var(--primary);">Go</button>
+                        </form>
+                    </td>
+                    <td style="padding: 12px 8px; text-align: right;">
+                        <div style="display: inline-flex; gap: 8px; justify-content: flex-end;">
+                            <!-- Reset balance button -->
+                            <button 
+                                hx-post="/api/admin/ledger/reset" 
+                                hx-target="#main-content" 
+                                hx-include="[name='user_id']" 
+                                hx-vals='{"user_id": "{{ user.id }}"}'
+                                onclick="if(!confirm('Reset token balance to 0 for {{ user.name }}?')) return false; window.sessionStorage.setItem('adminScroll', window.scrollY)"
+                                style="width: auto; padding: 4px 12px; font-size: 0.8rem; background-color: var(--error); height: 36px;"
+                            >
+                                Reset Balance
+                            </button>
+                            <!-- Reset PIN form -->
+                            <form hx-post="/api/admin/users/reset-pin" hx-target="#main-content" style="display: inline-flex; gap: 4px;" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
+                                <input type="hidden" name="user_id" value="{{ user.id }}">
+                                <input type="password" name="new_pin" placeholder="New PIN" pattern="\d{4}" maxlength="4" required style="width: 80px; padding: 4px 8px; font-size: 0.85rem; height: 36px; text-align: center;">
+                                <button type="submit" style="width: auto; padding: 4px 12px; font-size: 0.8rem; background-color: var(--text-muted); height: 36px;">Set PIN</button>
+                            </form>
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 
+    <!-- Recent Transactions Audit Log -->
+    {% if transactions %}
+    <div style="margin-bottom: 32px;">
+        <h3>Transaction Audit History</h3>
+        <details>
+            <summary style="font-size: 1rem; padding: 8px 12px;">View Recent Credits Transactions ({{ transactions | length }})</summary>
+            <div style="padding: 12px; background-color: #f9fafb; border-radius: 8px; font-size: 0.85rem; max-height: 250px; overflow-y: auto;">
+                {% for tx in transactions %}
+                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e5e7eb; padding: 6px 0;">
+                    <div>
+                        <strong style="color: var(--primary);">{{ tx.name }}</strong> 
+                        <span style="color: var(--text-muted);">({{ tx.category }})</span>: {{ tx.description or 'No comment' }}
+                    </div>
+                    <div style="font-weight: 700; color: {% if tx.amount < 0 %}var(--error){% else %}var(--success){% endif %};">
+                        {{ tx.amount | float }} credits
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </details>
+    </div>
+    {% endif %}
+
     <div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <h3>Chore Management</h3>
         </div>
         
-        <div style="display: grid; gap: 16px;">
-            {% for chore in chores %}
-            <div class="card" id="chore-{{ chore.id }}" style="border: 1px solid #e5e7eb; padding: 20px; box-shadow: none; {% if not chore.is_active %}opacity: 0.6; background: #f9fafb;{% endif %}">
-                <form hx-post="/api/admin/chores/update" hx-target="#main-content" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
-                    <input type="hidden" name="chore_id" value="{{ chore.id }}">
-                    
-                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 16px; margin-bottom: 12px;">
-                        <input type="text" name="title" value="{{ chore.title }}" style="font-weight: 700; font-size: 1.1rem; padding: 4px 8px;">
-                        
-                        <button 
-                            type="button"
-                            hx-post="/api/admin/chores/toggle/{{ chore.id }}" 
-                            hx-target="#main-content"
-                            onclick="window.sessionStorage.setItem('adminScroll', window.scrollY)"
-                            style="width: auto; padding: 8px 16px; font-size: 0.8rem; background-color: {% if chore.is_active %}#fee2e2; color: #ef4444;{% else %}#d1fae5; color: #10b981;{% endif %}"
-                        >
-                            {% if chore.is_active %}Disable{% else %}Enable{% endif %}
-                        </button>
-                    </div>
-
-                    <div style="margin-bottom: 12px;">
-                        <label style="font-size: 0.8rem; color: var(--text-muted);">Description</label>
-                        <textarea name="description" rows="2" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px; font-family: inherit;">{{ chore.description }}</textarea>
-                    </div>
-
-                    <div style="margin-bottom: 16px;">
-                        <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 8px;">Allowed Assignees (Check none for 'Everyone')</label>
-                        <div style="display: flex; flex-wrap: wrap; gap: 12px; background: #f9fafb; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb;">
-                            {% for u in users %}
-                            {% set user_id = loop.index %}
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.9rem; cursor: pointer;">
-                                <input type="checkbox" name="assigned_user_ids" value="{{ user_id }}" {% if user_id in chore.assigned_user_ids %}checked{% endif %} style="width: auto;">
-                                {{ u.name }}
-                            </label>
-                            {% endfor %}
-                        </div>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 100px; gap: 12px; align-items: end;">
-                        <div>
-                            <label style="font-size: 0.8rem; color: var(--text-muted);">Category</label>
-                            <select name="category" style="padding: 4px;">
-                                <option value="Kitchen" {% if chore.category == 'Kitchen' %}selected{% endif %}>Kitchen</option>
-                                <option value="Cleaning" {% if chore.category == 'Cleaning' %}selected{% endif %}>Cleaning</option>
-                                <option value="Organization" {% if chore.category == 'Organization' %}selected{% endif %}>Organization</option>
-                                <option value="Yard" {% if chore.category == 'Yard' %}selected{% endif %}>Yard</option>
-                                <option value="Personal" {% if chore.category == 'Personal' %}selected{% endif %}>Personal</option>
-                                <option value="General" {% if chore.category == 'General' %}selected{% endif %}>General</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="font-size: 0.8rem; color: var(--text-muted);">Frequency</label>
-                            <select name="frequency" style="padding: 4px;">
-                                <option value="daily" {% if chore.frequency == 'daily' %}selected{% endif %}>Daily (1x)</option>
-                                <option value="meal" {% if chore.frequency == 'meal' %}selected{% endif %}>Per Meal (3x)</option>
-                                <option value="weekly" {% if chore.frequency == 'weekly' %}selected{% endif %}>Weekly (1x)</option>
-                                <option value="adhoc" {% if chore.frequency == 'adhoc' %}selected{% endif %}>Ad-hoc (∞)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="font-size: 0.8rem; color: var(--text-muted);">Credits</label>
-                            <div style="display: flex; align-items: center; gap: 4px;">
-                                <input type="number" name="value_credits" value="{{ chore.value_credits }}" step="0.5" style="width: 100%; padding: 4px; text-align: center;">
+        <div style="display: grid; gap: 8px;">
+            {% set categories = chores | groupby('category') %}
+            {% for category, cat_chores in categories %}
+            <details class="cat-{{ category | lower }}">
+                <summary>
+                    {{ category }}
+                    <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-muted); margin-left: auto; margin-right: 12px;">{{ cat_chores | length }} items</span>
+                </summary>
+                <div style="padding: 12px; display: grid; gap: 16px; background: #f9fafb;">
+                    {% for chore in cat_chores %}
+                    <div class="card" id="chore-{{ chore.id }}" style="border: 1px solid #e5e7eb; padding: 20px; box-shadow: none; {% if not chore.is_active %}opacity: 0.6; background: #f9fafb;{% endif %}">
+                        <form hx-post="/api/admin/chores/update" hx-target="#main-content" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
+                            <input type="hidden" name="chore_id" value="{{ chore.id }}">
+                            
+                            <div style="display: grid; grid-template-columns: 1fr auto; gap: 16px; margin-bottom: 12px;">
+                                <input type="text" name="title" value="{{ chore.title }}" style="font-weight: 700; font-size: 1.1rem; padding: 4px 8px;">
+                                
+                                <button 
+                                    type="button"
+                                    hx-post="/api/admin/chores/toggle/{{ chore.id }}" 
+                                    hx-target="#main-content"
+                                    onclick="window.sessionStorage.setItem('adminScroll', window.scrollY)"
+                                    style="width: auto; padding: 8px 16px; font-size: 0.8rem; background-color: {% if chore.is_active %}#fee2e2; color: #ef4444;{% else %}#d1fae5; color: #10b981;{% endif %}"
+                                >
+                                    {% if chore.is_active %}Disable{% else %}Enable{% endif %}
+                                </button>
                             </div>
-                        </div>
-                    </div>
 
-                    <button type="submit" style="margin-top: 16px; padding: 8px; font-size: 0.9rem; background-color: var(--primary);">Save Changes</button>
-                </form>
-            </div>
+                            <div style="margin-bottom: 12px;">
+                                <label style="font-size: 0.8rem; color: var(--text-muted);">Description</label>
+                                <textarea name="description" rows="2" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px; font-family: inherit;">{{ chore.description }}</textarea>
+                            </div>
+
+                            <div style="margin-bottom: 16px;">
+                                <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 8px;">Allowed Assignees (Check none for 'Everyone')</label>
+                                <div style="display: flex; flex-wrap: wrap; gap: 12px; background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                    {% for u in users %}
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.9rem; cursor: pointer;">
+                                        <input type="checkbox" name="assigned_user_ids" value="{{ u.id }}" {% if u.id in chore.assigned_user_ids %}checked{% endif %} style="width: auto;">
+                                        {{ u.name }}
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 120px 80px; gap: 12px; align-items: end;">
+                                <div>
+                                    <label style="font-size: 0.8rem; color: var(--text-muted);">Category</label>
+                                    <select name="category" style="padding: 4px;">
+                                        <option value="Kitchen" {% if chore.category == 'Kitchen' %}selected{% endif %}>Kitchen</option>
+                                        <option value="Cleaning" {% if chore.category == 'Cleaning' %}selected{% endif %}>Cleaning</option>
+                                        <option value="Organization" {% if chore.category == 'Organization' %}selected{% endif %}>Organization</option>
+                                        <option value="Yard" {% if chore.category == 'Yard' %}selected{% endif %}>Yard</option>
+                                        <option value="Personal" {% if chore.category == 'Personal' %}selected{% endif %}>Personal</option>
+                                        <option value="General" {% if chore.category == 'General' %}selected{% endif %}>General</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.8rem; color: var(--text-muted);">Frequency</label>
+                                    <select name="frequency" style="padding: 4px;">
+                                        <option value="daily" {% if chore.frequency == 'daily' %}selected{% endif %}>Daily (1x)</option>
+                                        <option value="meal" {% if chore.frequency == 'meal' %}selected{% endif %}>Per Meal (3x)</option>
+                                        <option value="weekly" {% if chore.frequency == 'weekly' %}selected{% endif %}>Weekly (1x)</option>
+                                        <option value="adhoc" {% if chore.frequency == 'adhoc' %}selected{% endif %}>Ad-hoc (∞)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.8rem; color: var(--text-muted);">Max Daily Comp.</label>
+                                    <input type="number" name="max_daily_completions" value="{{ chore.max_daily_completions or 1 }}" min="1" max="999" style="padding: 4px; text-align: center;">
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.8rem; color: var(--text-muted);">Credits</label>
+                                    <div style="display: flex; align-items: center; gap: 4px;">
+                                        <input type="number" name="value_credits" value="{{ chore.value_credits }}" step="0.5" style="width: 100%; padding: 4px; text-align: center;">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" style="margin-top: 16px; padding: 8px; font-size: 0.9rem; background-color: var(--primary);">Save Changes</button>
+                        </form>
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
             {% endfor %}
         </div>
     </div>
