@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>HearthOps</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=1.1">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
@@ -17,15 +17,70 @@
             {% block content %}{% endblock %}
         </main>
 
-        <div class="admin-silhouette" 
-             hx-post="/api/admin-verify" 
-             hx-prompt="Admin PIN Required:" 
-             hx-target="#main-content">
+        <!-- Admin Silhouette Button -->
+        <div class="admin-silhouette" onclick="showAdminModal()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3"></circle>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
         </div>
+
+        <!-- Custom Admin PIN Modal -->
+        <div id="admin-modal" class="overlay">
+            <div class="modal">
+                <h3 style="text-align: center; margin-top: 0;">Admin Access</h3>
+                <p style="text-align: center; color: var(--text-muted); font-size: 0.9rem;">Enter PIN to open Console</p>
+                <input type="password" id="admin-pin-input" readonly 
+                       style="text-align: center; font-size: 2rem; letter-spacing: 0.5rem; height: 60px; margin-bottom: 16px;">
+                <div class="pin-grid">
+                    {% for i in range(1, 10) %}
+                    <button type="button" class="pin-btn" onclick="addAdminPin('{{ i }}')">{{ i }}</button>
+                    {% endfor %}
+                    <button type="button" class="pin-btn" onclick="clearAdminPin()" style="color: var(--error);">C</button>
+                    <button type="button" class="pin-btn" onclick="addAdminPin('0')">{{ 0 }}</button>
+                    <button type="button" onclick="submitAdminPin()" style="background-color: var(--primary);">GO</button>
+                </div>
+                <button type="button" onclick="hideAdminModal()" style="margin-top: 16px; background: none; color: var(--text-muted); padding: 8px;">Cancel</button>
+            </div>
+        </div>
     </div>
+
+    <script>
+        function showAdminModal() {
+            document.getElementById('admin-modal').classList.add('active');
+            document.getElementById('admin-pin-input').value = '';
+        }
+        function hideAdminModal() {
+            document.getElementById('admin-modal').classList.remove('active');
+        }
+        function addAdminPin(num) {
+            const input = document.getElementById('admin-pin-input');
+            if (input.value.length < 4) input.value += num;
+        }
+        function clearAdminPin() {
+            document.getElementById('admin-pin-input').value = '';
+        }
+        function submitAdminPin() {
+            const pin = document.getElementById('admin-pin-input').value;
+            if (pin.length === 4) {
+                htmx.ajax('POST', '/api/admin-verify', {
+                    target: '#main-content',
+                    headers: {'HX-Prompt': pin}
+                });
+                hideAdminModal();
+            }
+        }
+
+        // Celebrate Animation Trigger
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            if (evt.detail.target.id === 'main-content') {
+                const alert = document.querySelector('.alert-success');
+                if (alert) {
+                    alert.classList.add('celebrate');
+                    // Add confetti logic here later if desired
+                }
+            }
+        });
+    </script>
 </body>
 </html>
