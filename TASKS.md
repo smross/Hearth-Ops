@@ -33,3 +33,10 @@ This file tracks the active deployment state of the HearthOps monorepo. Use this
 - [ ] **Task 6.1:** Implement "Token Redemptions" (Rewards store) for kids to spend their earned credits.
 - [ ] **Task 6.2:** Configure Pi-hole API hooks to toggle internet access based on chore completion status.
 - [ ] **Task 6.3:** Add "Transaction History" view for kids to see their past earned/spent tokens.
+
+## 🟩 Phase 7: Family Announcements Feature
+- [x] **Task 7.1:** Design database schemas for `announcements` and individual user `announcement_acknowledgments`.
+- [x] **Task 7.2:** Construct the Admin Console interface for adding, active-toggling, and deleting announcements.
+- [x] **Task 7.3:** Implement landing page alert banner showing active notice cards dynamically.
+- [x] **Task 7.4:** Establish logged-in user interceptor modal requiring explicit "Got It" clicks to persist acknowledgments.
+- [x] **Task 7.5:** Standardize screensaver viewport constraints and unified America/Chicago CT/CDT AM/PM time formatting.

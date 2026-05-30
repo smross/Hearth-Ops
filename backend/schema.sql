@@ -82,6 +82,25 @@ CREATE TABLE IF NOT EXISTS google_calendars (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 8. Announcements Table
+CREATE TABLE IF NOT EXISTS announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active INTEGER DEFAULT 1 -- 1=Active, 0=Inactive
+);
+
+-- 9. Announcement Acknowledgments Table
+CREATE TABLE IF NOT EXISTS announcement_acknowledgments (
+    announcement_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    acknowledged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (announcement_id, user_id),
+    FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Indexes for performance tuning and fast UI loads
 CREATE INDEX IF NOT EXISTS idx_users_name ON users(name);
 CREATE INDEX IF NOT EXISTS idx_chores_assigned ON chores(assigned_user_id);
@@ -89,4 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON chore_logs(completed_at);
 CREATE INDEX IF NOT EXISTS idx_assignments_user ON chore_assignments(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_user ON token_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_encouragements_recipient ON encouragements(recipient_id);
+CREATE INDEX IF NOT EXISTS idx_announcements_active ON announcements(is_active);
+CREATE INDEX IF NOT EXISTS idx_acknowledgments_user ON announcement_acknowledgments(user_id);
+
 

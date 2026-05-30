@@ -41,10 +41,13 @@
                     <button type="button" onclick="submitAdminPin()" style="background-color: var(--primary);">GO</button>
                 </div>
                 <button type="button" onclick="hideAdminModal()" style="margin-top: 16px; background: none; color: var(--text-muted); padding: 8px;">Cancel</button>
+            </div>
+        </div>
+
         <!-- Screensaver Overlay to prevent burn-in -->
         <div id="screensaver-overlay" class="overlay" style="background-color: rgba(0, 0, 0, 0.95); opacity: 0; display: none; transition: opacity 0.5s ease; z-index: 10000; cursor: pointer; flex-direction: column; align-items: center; justify-content: center;">
             <div id="screensaver-content" style="text-align: center; animation: floatClock 25s infinite ease-in-out; color: rgba(255,255,255,0.85); user-select: none;">
-                <div id="screensaver-time" style="font-size: 5.5rem; font-weight: 200; letter-spacing: 2px; text-shadow: 0 4px 12px rgba(0,0,0,0.5);">12:00</div>
+                <div id="screensaver-time" style="font-size: 5.5rem; font-weight: 200; letter-spacing: 2px; text-shadow: 0 4px 12px rgba(0,0,0,0.5);">12:00 PM CDT</div>
                 <div style="font-size: 1.1rem; color: #818cf8; margin-top: 12px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase;">🏠 HearthOps</div>
                 <p style="font-size: 0.85rem; color: rgba(255,255,255,0.35); margin-top: 24px;">Tap anywhere to wake up</p>
             </div>
@@ -84,11 +87,16 @@
 
         function updateScreensaverTime() {
             const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const options = {
+                timeZone: 'America/Chicago',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+                timeZoneName: 'short'
+            };
             const screensaverTime = document.getElementById('screensaver-time');
             if (screensaverTime) {
-                screensaverTime.innerText = hours + ':' + minutes;
+                screensaverTime.innerText = now.toLocaleTimeString('en-US', options);
             }
         }
 

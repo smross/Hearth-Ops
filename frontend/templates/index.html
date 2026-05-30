@@ -7,37 +7,9 @@
 <div class="ticker-wrap" style="background: #eef2ff; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; font-size: 0.85rem; border-left: 4px solid var(--primary); display: flex; align-items: center; gap: 8px; overflow: hidden;">
     <span style="font-weight: 700; color: var(--primary); white-space: nowrap; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;">📢 Hearth:</span>
     <marquee scrollamount="5" style="margin: 0; color: #374151;">
-        {% if ticker %}
-            {% for item in ticker %}
-            <span style="margin-right: 24px;">🎉 <strong>{{ item.name }}</strong> did <em>{{ item.title }}</em> at {{ item.time_str }}</span>
-            {% endfor %}
-        {% else %}
-            {% set quotes = [
-                "Why did the chore go to school? To clean up its act!",
-                "Carpe Diem! A clean room is a clear mind. Which chore is next?",
-                "What did the broom say to the vacuum? I'm so swept away by your work ethic!",
-                "Every chore completed is a step closer to legendary status.",
-                "Why did the dust bunny cross the road? To escape your cleaning skills!",
-                "Cleanliness is next to... earning more tokens!",
-                "Choose your chore, build your routine, earn your reward!",
-                "What kind of head has no brain? A head of lettuce! Eat your veggies after chores!",
-                "Why did the computer squeak? Because someone used a mouse! Clean your desk!",
-                "Did you hear about the math teacher who was afraid of negative numbers? He'll stop at nothing to avoid them!",
-                "The secret of getting ahead is getting started. Tackle a routine now!",
-                "A little progress each day adds up to big results.",
-                "Keep going! You're doing amazing helper work today.",
-                "Teamwork makes the dream work. Help your family out today!",
-                "What did one plate say to the other? Dinner is on me! Let's wipe the dining table!",
-                "Your bed is a canvas, and you are the artist. Make it beautiful!",
-                "Why did the sponge cross the sink? To get to the clean side!",
-                "Work hard in silence, let your token balance make the noise!",
-                "You can do it! Small habits lead to giant successes.",
-                "Clean space, happy pace! Let's make it shine today!"
-            ] | shuffle %}
-            {% for q in quotes[:5] %}
-            <span style="margin-right: 48px;">✨ <strong>{{ q }}</strong></span>
-            {% endfor %}
-        {% endif %}
+        {% for item in ticker %}
+        <span style="margin-right: 32px;">{{ item | safe }}</span>
+        {% endfor %}
     </marquee>
 </div>
 
@@ -52,7 +24,7 @@
                     <div class="calendar-day-group">
                         <div class="calendar-day-title">{{ day.label }}</div>
                         {% for event in day.events %}
-                            <div class="calendar-event-item" style="border-left-color: {{ event.color }};">
+                            <div class="calendar-event-item{% if event.compressed %} compressed{% endif %}" style="border-left-color: {{ event.color }};">
                                 <div class="calendar-event-header">
                                     <span class="calendar-event-name">{{ event.summary }}</span>
                                     {% if not event.all_day %}
@@ -75,16 +47,36 @@
     </div>
 
     <!-- Middle Column: Identify Yourself Login (Grid Area chores equivalent) -->
-    <div class="grid-chores">
+    <div class="grid-chores card" style="padding: 16px;">
+        {% if active_announcements %}
+        <div class="announcements-banner" style="background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%); border: 1px solid #fde68a; border-radius: 12px; padding: 8px 12px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.85rem; color: #d97706; font-weight: 700; line-height: 1.2; text-align: center;">
+            <span>📢</span>
+            <span>Important Announcement: Please login to view.</span>
+        </div>
+        {% endif %}
         {% include "login_snippet.html" %}
     </div>
 
-    <!-- Right Column: Future Feature Placeholder -->
-    <div class="grid-future card" style="align-self: start; padding: 16px;">
-        <h4 style="margin-top: 0; margin-bottom: 8px; color: var(--text-muted); text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;">Future Space</h4>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0; line-height: 1.45;">
-            This space is reserved for upcoming integrations like shared shopping lists, weather forecasts, or family notes.
-        </p>
+    <!-- Right Column: Family Leaderboard -->
+    <div class="grid-future card" style="padding: 16px;">
+        <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px; font-size: 1.1rem; border-bottom: 2px solid #f3f4f6; padding-bottom: 8px; margin-bottom: 12px;">🏆 Weekly Leaderboard</h3>
+        {% if leaderboard %}
+            <div style="display: grid; gap: 8px;">
+                {% for entry in leaderboard %}
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f3f4f6; padding: 8px 0; font-size: 0.95rem;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: 800; color: var(--text-muted);">#{{ loop.index }}</span>
+                        <span style="font-weight: 700; color: var(--text);">{{ entry.name }}</span>
+                    </div>
+                    <span style="font-weight: 800; color: var(--success);">🪙 {{ entry.total_earned }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p style="font-style: italic; font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-top: 16px;">
+                No points earned in the last 7 days. Completed chores will rank here!
+            </p>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

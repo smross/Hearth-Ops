@@ -360,8 +360,8 @@ details.cat-outside { border-left: 4px solid #ef4444; }
    Responsive & Fold Adjustments (Height-focused)
    ========================================== */
 
-/* Target: Mobile Portrait & Mid-Height Tablets Landscape (height <= 950px) */
-@media screen and (max-height: 950px) {
+/* Target: Mobile Portrait & Mid-Height Tablets Portrait (height <= 950px and width < 900px) */
+@media screen and (max-height: 950px) and (max-width: 899px) {
     body {
         padding: 0px 8px 8px 8px;
     }
@@ -426,8 +426,8 @@ details.cat-outside { border-left: 4px solid #ef4444; }
     }
 }
 
-/* Target: Compact/Short devices (e.g. iPad Landscape, older/smaller Android - height <= 820px) */
-@media screen and (max-height: 820px) {
+/* Target: Compact/Short devices in portrait or very small screens */
+@media screen and (max-height: 820px) and (max-width: 899px) {
     .ticker-wrap {
         display: none !important; /* Save 50px of vertical space */
     }
@@ -476,11 +476,33 @@ details.cat-outside { border-left: 4px solid #ef4444; }
         grid-template-columns: 1fr 2fr 1fr;
         grid-template-areas:
             "calendar chores future";
+        align-items: stretch; /* Stretch columns to match the tallest one */
     }
-}
-
-.grid-calendar {
-    grid-area: calendar;
+    .grid-chores {
+        align-self: stretch !important;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    .grid-chores > form,
+    .grid-chores > .card > form {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .calendar-card {
+        align-self: stretch !important;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    .grid-future {
+        align-self: stretch !important;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
 }
 
 .grid-chores {
@@ -552,6 +574,22 @@ details.cat-outside { border-left: 4px solid #ef4444; }
     font-size: 0.7rem;
     color: var(--text-muted);
     font-style: italic;
+}
+
+/* Compressed styles for all-day events when calendar is busy */
+.calendar-event-item.compressed {
+    padding: 3px 8px;
+    margin-bottom: 4px;
+    font-size: 0.75rem;
+}
+
+.calendar-event-item.compressed .calendar-source-name {
+    display: none;
+}
+
+.calendar-event-item.compressed .calendar-event-time {
+    font-size: 0.6rem;
+    padding: 1px 4px !important;
 }
 
 

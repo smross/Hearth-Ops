@@ -242,14 +242,31 @@
                     <strong style="color: var(--text);">{{ cal.name }}</strong>
                     <span style="font-size: 0.8rem; color: var(--text-muted); display: block; word-break: break-all; margin-top: 2px;">{{ cal.ical_url[:80] }}{% if cal.ical_url | length > 80 %}...{% endif %}</span>
                 </div>
-                <button 
-                    hx-post="/api/admin/calendars/delete/{{ cal.id }}"
-                    hx-target="#main-content"
-                    onclick="if(!confirm('Unlink calendar connection: {{ cal.name }}?')) return false; window.sessionStorage.setItem('adminScroll', window.scrollY)"
-                    style="width: auto; padding: 6px 12px; font-size: 0.8rem; background-color: var(--error);"
-                >
-                    Delete
-                </button>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <select 
+                        name="color" 
+                        hx-post="/api/admin/calendars/update-color/{{ cal.id }}"
+                        hx-target="#main-content"
+                        hx-trigger="change"
+                        onchange="window.sessionStorage.setItem('adminScroll', window.scrollY)"
+                        style="width: 110px; padding: 4px; font-size: 0.8rem; font-weight: 600; height: 32px; border-radius: 6px; cursor: pointer; border: 1px solid #e5e7eb;"
+                    >
+                        <option value="#3b82f6" {% if cal.color == '#3b82f6' %}selected{% endif %} style="color: #3b82f6;">Blue</option>
+                        <option value="#10b981" {% if cal.color == '#10b981' %}selected{% endif %} style="color: #10b981;">Green</option>
+                        <option value="#ef4444" {% if cal.color == '#ef4444' %}selected{% endif %} style="color: #ef4444;">Red</option>
+                        <option value="#f59e0b" {% if cal.color == '#f59e0b' %}selected{% endif %} style="color: #f59e0b;">Orange</option>
+                        <option value="#8b5cf6" {% if cal.color == '#8b5cf6' %}selected{% endif %} style="color: #8b5cf6;">Purple</option>
+                        <option value="#ec4899" {% if cal.color == '#ec4899' %}selected{% endif %} style="color: #ec4899;">Pink</option>
+                    </select>
+                    <button 
+                        hx-post="/api/admin/calendars/delete/{{ cal.id }}"
+                        hx-target="#main-content"
+                        onclick="if(!confirm('Unlink calendar connection: {{ cal.name }}?')) return false; window.sessionStorage.setItem('adminScroll', window.scrollY)"
+                        style="width: auto; padding: 6px 12px; font-size: 0.8rem; background-color: var(--error);"
+                    >
+                        Delete
+                    </button>
+                </div>
             </div>
             {% endfor %}
         </div>
@@ -295,4 +312,69 @@
             <div id="calendar-test-result" style="margin-top: 4px; font-size: 0.85rem; font-weight: 600; word-break: break-all;"></div>
         </form>
     </div>
+
+    <!-- Announcements Management -->
+    <div style="margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px; margin-bottom: 16px;">
+        <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">📢 Announcements</h3>
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 16px;">
+            Post messages that appear as alerts on the main page, and as mandatory acknowledgment popups when users log in.
+        </p>
+
+        <!-- Announcements List -->
+        {% if announcements %}
+        <div style="display: grid; gap: 8px; margin-bottom: 20px;">
+            {% for ann in announcements %}
+            <div style="display: flex; justify-content: space-between; align-items: center; background: #f9fafb; padding: 12px 16px; border-radius: 8px; border: 1px solid #e5e7eb; border-left: 5px solid {% if ann.is_active %}var(--primary){% else %}#9ca3af{% endif %};">
+                <div style="flex-grow: 1; margin-right: 16px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <strong style="color: var(--text);">{{ ann.title }}</strong>
+                        {% if ann.is_active %}
+                        <span style="background: #ecfdf5; color: #047857; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Active</span>
+                        {% else %}
+                        <span style="background: #f3f4f6; color: #4b5563; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Inactive</span>
+                        {% endif %}
+                    </div>
+                    <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-top: 4px;">{{ ann.content }}</span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button 
+                        hx-post="/api/admin/announcements/toggle/{{ ann.id }}"
+                        hx-target="#main-content"
+                        onclick="window.sessionStorage.setItem('adminScroll', window.scrollY)"
+                        style="width: auto; padding: 6px 12px; font-size: 0.8rem; background-color: {% if ann.is_active %}var(--text-muted){% else %}var(--success){% endif %};"
+                    >
+                        {% if ann.is_active %}Deactivate{% else %}Activate{% endif %}
+                    </button>
+                    <button 
+                        hx-post="/api/admin/announcements/delete/{{ ann.id }}"
+                        hx-target="#main-content"
+                        onclick="if(!confirm('Delete this announcement?')) return false; window.sessionStorage.setItem('adminScroll', window.scrollY)"
+                        style="width: auto; padding: 6px 12px; font-size: 0.8rem; background-color: var(--error);"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="font-style: italic; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 20px;">No announcements posted yet.</p>
+        {% endif %}
+
+        <!-- Create Announcement Form -->
+        <form hx-post="/api/admin/announcements/add" hx-target="#main-content" style="background: #f9fafb; padding: 16px; border-radius: 12px; border: 1px solid #e5e7eb; display: grid; gap: 12px;" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
+            <div>
+                <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Announcement Title</label>
+                <input type="text" name="title" placeholder="e.g. Family Meeting Tonight" required style="width: 100%; padding: 8px; font-size: 0.9rem; height: 38px;">
+            </div>
+            <div>
+                <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Announcement Message / Instructions</label>
+                <textarea name="content" placeholder="e.g. Please finish all your chores before 6:00 PM for movie night prep." required style="width: 100%; padding: 8px; font-size: 0.9rem; height: 80px; font-family: inherit; resize: none;"></textarea>
+            </div>
+            <button type="submit" style="padding: 10px; background-color: var(--primary); color: white; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                Post Announcement
+            </button>
+        </form>
+    </div>
 </div>
+
