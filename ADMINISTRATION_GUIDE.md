@@ -16,15 +16,14 @@ The default generic names are populated by the database seeding script. To use y
 1. Create a file named `family_members.json` in the `backend/` directory (this filename is ignored in `.gitignore`).
 2. Populate the file with your family profile names, PINs, and parent roles in JSON format:
    ```json
-   [
-       {"name": "Parent 1", "pin": "3157", "is_parent": 1},
-       {"name": "Parent 2", "pin": "9019", "is_parent": 1},
-       {"name": "Child 3", "pin": "0129", "is_parent": 0},
-       {"name": "Child 1", "pin": "1019", "is_parent": 0},
-       {"name": "Child 2", "pin": "0404", "is_parent": 0},
-       {"name": "Child 4", "pin": "0924", "is_parent": 0}
-   ]
-   ```
+    [
+        {"name": "Parent 1", "pin": "1234", "is_parent": 1},
+        {"name": "Parent 2", "pin": "5678", "is_parent": 1},
+        {"name": "Child 1", "pin": "1111", "is_parent": 0},
+        {"name": "Child 2", "pin": "2222", "is_parent": 0},
+        {"name": "Child 3", "pin": "3333", "is_parent": 0}
+    ]
+    ```
 3. Run the database seed script to apply:
    *   **Docker Container:** `docker compose exec backend python seed.py`
    *   **Local Python environment:** `python backend/seed.py`
