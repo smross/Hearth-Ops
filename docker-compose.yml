@@ -17,6 +17,7 @@ services:
       - DATABASE_URL=sqlite:////app/data/hearth.db
       - SECRET_KEY=${SECRET_KEY}
       - APP_ENV=${APP_ENV:-production}
+      - TZ=${TZ:-America/Chicago}
     networks:
       - hearth_net
 
