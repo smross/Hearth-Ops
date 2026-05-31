@@ -287,6 +287,7 @@ def jinja_shuffle(l):
         return l
 
 templates.env.filters["shuffle"] = jinja_shuffle
+templates.env.globals["app_env"] = os.getenv("APP_ENV", "production")
 app.mount("/static", StaticFiles(directory=os.path.join(FRONTEND_DIR, "static")), name="static")
 
 # --- Models ---
