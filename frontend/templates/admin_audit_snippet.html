@@ -1,0 +1,227 @@
+<!-- Admin Audit Log & Remediation Snippet -->
+<div style="margin-bottom: 20px;">
+    {% if message %}
+    <div class="alert alert-success" style="margin-bottom: 16px; border-left: 5px solid var(--success);">{{ message }}</div>
+    {% endif %}
+
+    {% if error %}
+    <div class="alert alert-error" style="margin-bottom: 16px; border-left: 5px solid var(--error);">{{ error }}</div>
+    {% endif %}
+
+    <!-- Filtering Bar -->
+    <form id="audit-filter-form" hx-get="/api/admin/audit/query" hx-target="#admin-audit-portal" hx-trigger="change" style="background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 12px; align-items: end; margin-bottom: 20px;">
+        <input type="hidden" name="page" value="1"> <!-- Reset to page 1 on filter change -->
+        
+        <div>
+            <label style="font-size: 0.8rem; font-weight: 600; color: #475569; display: block; margin-bottom: 4px;">Assignee</label>
+            <select name="user_id" onchange="this.form.dispatchEvent(new Event('submit'))" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.85rem; height: 38px; background: white;">
+                <option value="">All Family Members</option>
+                {% for u in all_users %}
+                <option value="{{ u.id }}" {% if user_id == u.id %}selected{% endif %}>{{ u.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label style="font-size: 0.8rem; font-weight: 600; color: #475569; display: block; margin-bottom: 4px;">Chore Type</label>
+            <select name="chore_id" onchange="this.form.dispatchEvent(new Event('submit'))" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.85rem; height: 38px; background: white;">
+                <option value="">All Chores</option>
+                {% for c in all_chores %}
+                <option value="{{ c.id }}" {% if chore_id == c.id %}selected{% endif %}>{{ c.title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label style="font-size: 0.8rem; font-weight: 600; color: #475569; display: block; margin-bottom: 4px;">Start Date</label>
+            <input type="date" name="start_date" value="{{ start_date }}" onchange="this.form.dispatchEvent(new Event('submit'))" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.85rem; height: 38px; background: white;">
+        </div>
+
+        <div>
+            <label style="font-size: 0.8rem; font-weight: 600; color: #475569; display: block; margin-bottom: 4px;">End Date</label>
+            <input type="date" name="end_date" value="{{ end_date }}" onchange="this.form.dispatchEvent(new Event('submit'))" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.85rem; height: 38px; background: white;">
+        </div>
+
+        <div>
+            <label style="font-size: 0.8rem; font-weight: 600; color: #475569; display: block; margin-bottom: 4px;">Timeframe</label>
+            <select name="days" onchange="this.form.dispatchEvent(new Event('submit'))" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.85rem; height: 38px; background: white;">
+                <option value="7" {% if days == 7 %}selected{% endif %}>Last 7 Days</option>
+                <option value="30" {% if days == 30 or not days %}selected{% endif %}>Last 30 Days</option>
+                <option value="90" {% if days == 90 %}selected{% endif %}>Last 90 Days</option>
+            </select>
+        </div>
+    </form>
+
+    <!-- Paginated Chore Log Table -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+            <thead>
+                <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
+                    <th style="padding: 12px 16px; width: 20%;">Date Completed</th>
+                    <th style="padding: 12px 16px; width: 15%;">Member</th>
+                    <th style="padding: 12px 16px; width: 20%;">Chore Completed</th>
+                    <th style="padding: 12px 16px; width: 10%; text-align: right;">Credits</th>
+                    <th style="padding: 12px 16px; width: 23%;">Feedback / Admin Note</th>
+                    <th style="padding: 12px 16px; width: 12%; text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr style="border-bottom: 1px solid #f1f5f9; {% if log.action_type == 'undo' %}background: #fef2f2; opacity: 0.7;{% endif %}">
+                    <td style="padding: 12px 16px; font-size: 0.85rem; color: #64748b;">
+                        {{ log.completed_at }}
+                    </td>
+                    <td style="padding: 12px 16px; font-weight: 600;">
+                        {{ log.user_name }}
+                    </td>
+                    <td style="padding: 12px 16px;">
+                        <span style="font-weight: 500;">{{ log.chore_title }}</span>
+                        {% if log.action_type == 'undo' %}
+                        <span style="display: inline-block; background: #ef4444; color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 600; margin-left: 6px;">REVERSED</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 12px 16px; text-align: right; font-weight: 700; color: {% if log.action_type == 'undo' %}#ef4444{% else %}var(--success){% endif %};">
+                        {% if log.action_type == 'undo' %}-{% endif %}🪙 {{ log.credits_delta }}
+                    </td>
+                    <td style="padding: 12px 16px; font-style: italic; color: #475569; font-size: 0.85rem;">
+                        {{ log.admin_note or '' }}
+                    </td>
+                    <td style="padding: 12px 16px; text-align: center;">
+                        {% if log.action_type != 'undo' %}
+                        <details style="position: relative; display: inline-block;">
+                            <summary style="background: #475569; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; display: inline-block; list-style: none; user-select: none;">
+                                Remediate
+                            </summary>
+                            <div style="position: absolute; right: 0; background: white; border: 1px solid #cbd5e1; padding: 16px; border-radius: 12px; z-index: 100; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); width: 300px; text-align: left; margin-top: 6px;">
+                                <h4 style="margin-top: 0; margin-bottom: 12px; color: #1e293b; font-size: 0.95rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
+                                    Remediate: {{ log.chore_title }}
+                                </h4>
+                                
+                                <form hx-post="/api/admin/audit/remediate" hx-target="#admin-audit-portal" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
+                                    <input type="hidden" name="log_id" value="{{ log.log_id }}">
+                                    <input type="hidden" name="page" value="{{ page }}">
+                                    <input type="hidden" name="days" value="{{ days }}">
+                                    <input type="hidden" name="start_date" value="{{ start_date }}">
+                                    <input type="hidden" name="end_date" value="{{ end_date }}">
+                                    <input type="hidden" name="filter_user_id" value="{{ user_id }}">
+                                    <input type="hidden" name="filter_chore_id" value="{{ chore_id }}">
+                                    
+                                    <div style="margin-bottom: 10px;">
+                                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: #475569; margin-bottom: 4px;">Remediation Action</label>
+                                        <select name="action_type" onchange="toggleReassign(this, {{ log.log_id }})" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.8rem;">
+                                            <option value="comment">Flag / Add Comment Only</option>
+                                            <option value="undo">Undo / Reverse Credits</option>
+                                            <option value="reassign">Reassign Completion User</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Dynamic reassign field -->
+                                    <div id="reassign-target-{{ log.log_id }}" style="display: none; margin-bottom: 10px;">
+                                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: #475569; margin-bottom: 4px;">New Assignee</label>
+                                        <select name="new_user_id" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.8rem;">
+                                            {% for u in all_users %}
+                                            <option value="{{ u.id }}">{{ u.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <div style="margin-bottom: 12px;">
+                                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: #475569; margin-bottom: 4px;">Admin Note / Reason</label>
+                                        <input type="text" name="admin_note" placeholder="e.g. Completed by Sarah instead" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.8rem; box-sizing: border-box;">
+                                    </div>
+                                    
+                                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                                        <div>
+                                            <label style="display: block; font-size: 0.65rem; font-weight: 600; color: #64748b; margin-bottom: 2px;">Admin User</label>
+                                            <select name="admin_user_id" style="width: 100%; padding: 4px; font-size: 0.75rem; border-radius: 4px; border: 1px solid #cbd5e1;">
+                                                {% for a in admin_users %}
+                                                <option value="{{ a.id }}">{{ a.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label style="display: block; font-size: 0.65rem; font-weight: 600; color: #64748b; margin-bottom: 2px;">Admin PIN</label>
+                                            <input type="password" name="admin_pin" required placeholder="PIN" pattern="\d{4}" maxlength="4" style="width: 100%; padding: 4px; font-size: 0.75rem; border-radius: 4px; border: 1px solid #cbd5e1; text-align: center;">
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="submit" style="width: 100%; padding: 8px; background: #ef4444; color: white; border-radius: 6px; border: none; font-weight: 600; font-size: 0.8rem; cursor: pointer;">
+                                        Apply Remediation
+                                    </button>
+                                </form>
+                            </div>
+                        </details>
+                        {% else %}
+                        <span style="font-size: 0.75rem; color: #94a3b8; font-style: italic;">Locked</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not logs %}
+                <tr>
+                    <td colspan="6" style="padding: 24px; text-align: center; color: #94a3b8; font-style: italic;">
+                        No completed chore logs found matching the filter criteria.
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        
+        <!-- Pagination Controls -->
+        {% if total_pages > 1 %}
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #f8fafc; border-top: 1px solid #cbd5e1; font-size: 0.85rem;">
+            <span style="color: #64748b;">Showing page <strong>{{ page }}</strong> of <strong>{{ total_pages }}</strong> ({{ total_count }} total entries)</span>
+            
+            <div style="display: inline-flex; gap: 8px;">
+                {% if page > 1 %}
+                <button 
+                    hx-get="/api/admin/audit/query?page={{ page - 1 }}&days={{ days }}&start_date={{ start_date }}&end_date={{ end_date }}&user_id={{ user_id }}&chore_id={{ chore_id }}" 
+                    hx-target="#admin-audit-portal" 
+                    style="width: auto; padding: 6px 12px; font-size: 0.8rem; background: white; border: 1px solid #cbd5e1; color: #475569; border-radius: 6px;"
+                >
+                    &larr; Previous
+                </button>
+                {% endif %}
+                
+                {% if page < total_pages %}
+                <button 
+                    hx-get="/api/admin/audit/query?page={{ page + 1 }}&days={{ days }}&start_date={{ start_date }}&end_date={{ end_date }}&user_id={{ user_id }}&chore_id={{ chore_id }}" 
+                    hx-target="#admin-audit-portal" 
+                    style="width: auto; padding: 6px 12px; font-size: 0.8rem; background: white; border: 1px solid #cbd5e1; color: #475569; border-radius: 6px;"
+                >
+                    Next &rarr;
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Audit Log Trail (History of Edits) -->
+    <div style="margin-top: 24px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px;">
+        <h4 style="margin-top: 0; color: #334155; font-size: 0.95rem; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            ⚠️ Administrative Audit Trail (Recent Actions)
+        </h4>
+        <div style="max-height: 180px; overflow-y: auto; font-size: 0.8rem; display: grid; gap: 6px;">
+            {% for trail in audit_trail %}
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #334155;"><span style="color: #64748b; font-family: monospace;">[{{ trail.created_at }}]</span> <strong>{{ trail.admin_name }}</strong>: {{ trail.details }}</span>
+            </div>
+            {% endfor %}
+            {% if not audit_trail %}
+            <span style="color: #94a3b8; font-style: italic; text-align: center; padding: 12px;">No remediation actions logged yet.</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleReassign(selectElement, logId) {
+        const reassignDiv = document.getElementById('reassign-target-' + logId);
+        if (selectElement.value === 'reassign') {
+            reassignDiv.style.display = 'block';
+        } else {
+            reassignDiv.style.display = 'none';
+        }
+    }
+</script>

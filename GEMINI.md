@@ -4,7 +4,7 @@ This file provides foundational context for Gemini CLI when working on the Heart
 
 ## 📍 Project State
 - **Current Phase:** Phase 5 (Docker Integration & Local Validation) completed.
-- **Production Status:** Running as persistent Docker service on PC (192.168.4.146:8000).
+- **Production Status:** Running as persistent Docker service on PC (192.168.40.21:8000).
 - **Completed:** Multi-user assignments, frequency enforcement, and full Admin Console.
 - **Active Branch:** `feature/alpha-scaffold`
 - **Roadmap:** Refer to `TASKS.md` for the granular checklist.

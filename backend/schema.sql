@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS chores (
     is_active INTEGER DEFAULT 1, -- 1=True, 0=False
     is_required INTEGER DEFAULT 0, -- 1=Required, 0=Optional
     is_shared INTEGER DEFAULT 0, -- 1=Shared/Public, 0=Assigned
+    after_four_pm INTEGER DEFAULT 0, -- 1=Only available after 4:00 PM local time, 0=No time restriction
     FOREIGN KEY (assigned_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
@@ -36,6 +37,7 @@ CREATE TABLE IF NOT EXISTS chore_logs (
     action_type TEXT DEFAULT 'earn', -- 'earn', 'undo'
     credits_delta REAL NOT NULL DEFAULT 0.0,
     completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    admin_note TEXT,
     FOREIGN KEY (chore_id) REFERENCES chores(id),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
@@ -101,7 +103,18 @@ CREATE TABLE IF NOT EXISTS announcement_acknowledgments (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- 10. Admin Audit Logs (Audit Trail)
+CREATE TABLE IF NOT EXISTS admin_audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id INTEGER NOT NULL,
+    action_type TEXT NOT NULL, -- 'undo', 'reassign', 'comment'
+    details TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Indexes for performance tuning and fast UI loads
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_admin ON admin_audit_logs(admin_id);
 CREATE INDEX IF NOT EXISTS idx_users_name ON users(name);
 CREATE INDEX IF NOT EXISTS idx_chores_assigned ON chores(assigned_user_id);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON chore_logs(completed_at);

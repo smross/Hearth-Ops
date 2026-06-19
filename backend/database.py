@@ -33,7 +33,24 @@ def init_db():
             with sqlite3.connect(DB_PATH) as conn:
                 with open(schema_path, "r") as f:
                     conn.executescript(f.read())
-            logger.info("Database schema check/initialization completed successfully.")
+                
+                # Check and dynamically add admin_note if missing from existing databases
+                cursor = conn.cursor()
+                cursor.execute("PRAGMA table_info(chore_logs)")
+                columns = [row[1] for row in cursor.fetchall()]
+                if 'admin_note' not in columns:
+                    cursor.execute("ALTER TABLE chore_logs ADD COLUMN admin_note TEXT;")
+                    conn.commit()
+                    logger.info("Migrated chore_logs: Added admin_note column successfully.")
+
+                # Check and dynamically add after_four_pm if missing from chores table
+                cursor.execute("PRAGMA table_info(chores)")
+                chore_columns = [row[1] for row in cursor.fetchall()]
+                if 'after_four_pm' not in chore_columns:
+                    cursor.execute("ALTER TABLE chores ADD COLUMN after_four_pm INTEGER DEFAULT 0;")
+                    conn.commit()
+                    logger.info("Migrated chores: Added after_four_pm column successfully.")
+            logger.info("Database schema check/initialization and migrations completed successfully.")
         except Exception as e:
             logger.error(f"Failed to check/initialize database schema: {e}")
             raise
