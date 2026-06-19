@@ -44,6 +44,28 @@ def format_to_central_time(utc_datetime_str: str) -> str:
         logger.error(f"Error converting timezone: {e}")
         return utc_datetime_str
 
+def format_to_central_datetime(utc_datetime_str: str) -> str:
+    """Converts UTC datetime string from SQLite to America/Chicago and formats as MM/DD/YYYY I:M AM/PM CT."""
+    try:
+        if " " in utc_datetime_str:
+            clean_str = utc_datetime_str.replace(" ", "T")
+        else:
+            clean_str = utc_datetime_str
+        
+        if "+" not in clean_str and "Z" not in clean_str:
+            clean_str += "+00:00"
+            
+        dt = dt_class.fromisoformat(clean_str.replace("Z", "+00:00"))
+        central_tz = ZoneInfo("America/Chicago")
+        central_dt = dt.astimezone(central_tz)
+        datetime_str = central_dt.strftime("%m/%d/%Y %I:%M %p").lstrip('0')
+        tz_str = central_dt.strftime("%Z")
+        return f"{datetime_str} {tz_str}"
+    except Exception as e:
+        logger.error(f"Error converting timezone: {e}")
+        return utc_datetime_str
+
+
 FAMILY_QUOTES = [
     "Why did the chore go to school? To clean up its act!",
     "Carpe Diem! A clean room is a clear mind. Which chore is next?",
@@ -385,7 +407,7 @@ def get_admin_data(cursor):
     cursor.execute("SELECT id, name, token_balance FROM users ORDER BY name")
     users = cursor.fetchall()
     
-    cursor.execute("SELECT id, title, description, category, frequency, value_credits, max_daily_completions, is_active FROM chores ORDER BY category, title")
+    cursor.execute("SELECT id, title, description, category, frequency, value_credits, max_daily_completions, is_active, is_required, after_four_pm FROM chores ORDER BY category, title")
     chores = cursor.fetchall()
     
     chore_list = []
@@ -557,6 +579,39 @@ async def admin_reset_user_pin(request: Request, user_id: int = Form(...), new_p
             "message": msg
         })
 
+@app.post("/api/admin/users/rename/{user_id}", response_class=HTMLResponse)
+async def admin_rename_user(
+    request: Request,
+    user_id: int,
+    name: str = Form(...)
+):
+    """Renames a family member from the admin console (inline editable)."""
+    name_stripped = name.strip()
+    if not name_stripped:
+        return HTMLResponse(content='<div class="alert alert-error">Name cannot be empty.</div>', status_code=400)
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE users SET name = ? WHERE id = ?", (name_stripped, user_id))
+            conn.commit()
+            msg = f"Renamed profile to '{name_stripped}' successfully."
+            err = None
+        except Exception as e:
+            msg = None
+            err = f"Database error: {str(e)}"
+            
+        users, chores, transactions, google_calendars, announcements = get_admin_data(cursor)
+        return templates.TemplateResponse(request, "admin_snippet.html", {
+            "users": users,
+            "chores": chores,
+            "transactions": transactions,
+            "google_calendars": google_calendars,
+            "announcements": announcements,
+            "message": msg,
+            "error": err
+        })
+
+
 @app.post("/api/admin/chores/toggle/{chore_id}", response_class=HTMLResponse)
 async def admin_toggle_chore(request: Request, chore_id: int):
     """Toggles a chore's active status from the admin panel."""
@@ -586,6 +641,8 @@ async def admin_update_chore(
     frequency: str = Form(...),
     value_credits: float = Form(...),
     max_daily_completions: int = Form(1),
+    is_required: int = Form(0),
+    after_four_pm: int = Form(0),
     assigned_user_ids: List[int] = Form([])
 ):
     """Updates all fields for a specific chore, including multi-user assignments."""
@@ -596,10 +653,10 @@ async def admin_update_chore(
             cursor.execute(
                 """
                 UPDATE chores 
-                SET title = ?, description = ?, category = ?, frequency = ?, value_credits = ?, max_daily_completions = ? 
+                SET title = ?, description = ?, category = ?, frequency = ?, value_credits = ?, max_daily_completions = ?, is_required = ?, after_four_pm = ? 
                 WHERE id = ?
                 """, 
-                (title, description, category, frequency, value_credits, max_daily_completions, chore_id)
+                (title, description, category, frequency, value_credits, max_daily_completions, is_required, after_four_pm, chore_id)
             )
             
             # Update Assignments: Clear old and insert new
@@ -661,13 +718,23 @@ def render_dashboard(request: Request, user_id: int, cursor, message: Optional[s
     progress = cursor.fetchone()
     completed_today = progress["completed_today"] if progress else 0
 
+    # Get current hour in Central Time to filter after_four_pm chores
+    from zoneinfo import ZoneInfo
+    import datetime
+    central_tz = ZoneInfo("America/Chicago")
+    now_central = datetime.datetime.now(central_tz)
+    current_hour = now_central.hour
+
     # 4. Available chores (Personal + Shared chores)
     cursor.execute(
         """
-        SELECT c.id, c.title, c.description, c.category, c.frequency, c.value_credits, c.max_daily_completions, c.is_required, c.is_shared,
+        SELECT c.id, c.title, c.description, c.category, c.frequency, c.value_credits, c.max_daily_completions, c.is_required, c.is_shared, c.after_four_pm,
                (SELECT COUNT(*) FROM chore_assignments WHERE chore_id = c.id) as is_assigned
         FROM chores c
         WHERE c.is_active = 1 
+        AND (
+            c.after_four_pm = 0 OR ? >= 16
+        )
         AND (
             c.is_shared = 1
             OR NOT EXISTS (SELECT 1 FROM chore_assignments WHERE chore_id = c.id)
@@ -696,7 +763,7 @@ def render_dashboard(request: Request, user_id: int, cursor, message: Optional[s
         )
         ORDER BY c.category, c.title
         """,
-        (user_id, user_id, user_id)
+        (current_hour, user_id, user_id, user_id, user_id)
     )
     available_chores = cursor.fetchall()
 
@@ -868,7 +935,7 @@ async def complete_chore_ui(
             if chore["is_required"] == 0:
                 cursor.execute(
                     """
-                    SELECT c.id, c.title, c.is_shared
+                    SELECT c.id, c.title, c.is_shared, c.frequency
                     FROM chores c
                     WHERE c.is_active = 1
                     AND c.is_required = 1
@@ -882,30 +949,69 @@ async def complete_chore_ui(
                 )
                 required_chores = cursor.fetchall()
                 
+                # Check current day of week (0=Monday, 6=Sunday)
+                from zoneinfo import ZoneInfo
+                import datetime
+                central_tz = ZoneInfo("America/Chicago")
+                now_central = datetime.datetime.now(central_tz)
+                current_weekday = now_central.weekday()  # Monday is 0, Sunday is 6
+                is_weekend = current_weekday in (5, 6) # Saturday (5) or Sunday (6)
+                
                 uncompleted_required = []
                 for req in required_chores:
-                    if req["is_shared"] == 1:
-                        cursor.execute(
-                            """
-                            SELECT 1 FROM chore_logs
-                            WHERE chore_id = ? AND user_id = ?
-                            AND action_type = 'earn'
-                            AND date(completed_at, 'localtime') = date('now', 'localtime')
-                            """,
-                            (req["id"], user_id)
-                        )
+                    # Skip weekly required chores during weekdays (Mon-Fri) to allow daily chores first
+                    if req["frequency"] == 'weekly' and not is_weekend:
+                        continue
+                        
+                    if req["frequency"] == 'weekly':
+                        # Check if completed this calendar week (since Sunday)
+                        if req["is_shared"] == 1:
+                            cursor.execute(
+                                """
+                                SELECT 1 FROM chore_logs
+                                WHERE chore_id = ? AND user_id = ?
+                                AND action_type = 'earn'
+                                AND date(completed_at, 'localtime', 'weekday 0', '-7 days') = date('now', 'localtime', 'weekday 0', '-7 days')
+                                """,
+                                (req["id"], user_id)
+                            )
+                        else:
+                            cursor.execute(
+                                """
+                                SELECT 1 FROM chore_logs
+                                WHERE chore_id = ?
+                                AND action_type = 'earn'
+                                AND date(completed_at, 'localtime', 'weekday 0', '-7 days') = date('now', 'localtime', 'weekday 0', '-7 days')
+                                """,
+                                (req["id"],)
+                            )
                     else:
-                        cursor.execute(
-                            """
-                            SELECT 1 FROM chore_logs
-                            WHERE chore_id = ?
-                            AND action_type = 'earn'
-                            AND date(completed_at, 'localtime') = date('now', 'localtime')
-                            """,
-                            (req["id"],)
-                        )
+                        # Daily / Meal frequency chores - check if completed today
+                        if req["is_shared"] == 1:
+                            cursor.execute(
+                                """
+                                SELECT 1 FROM chore_logs
+                                WHERE chore_id = ? AND user_id = ?
+                                AND action_type = 'earn'
+                                AND date(completed_at, 'localtime') = date('now', 'localtime')
+                                """,
+                                (req["id"], user_id)
+                            )
+                        else:
+                            cursor.execute(
+                                """
+                                SELECT 1 FROM chore_logs
+                                WHERE chore_id = ?
+                                AND action_type = 'earn'
+                                AND date(completed_at, 'localtime') = date('now', 'localtime')
+                                """,
+                                (req["id"],)
+                            )
                     if not cursor.fetchone():
-                        uncompleted_required.append(req["title"])
+                        if req["frequency"] == 'weekly':
+                            uncompleted_required.append(f"{req['title']} (Weekly)")
+                        else:
+                            uncompleted_required.append(req["title"])
                 
                 if uncompleted_required:
                     return render_dashboard(
@@ -994,6 +1100,34 @@ async def user_change_pin_ui(
             return render_dashboard(request, user_id, cursor, message="PIN updated successfully!")
         except Exception as e:
             return HTMLResponse(content=f"Error changing PIN: {str(e)}", status_code=500)
+
+@app.post("/api/user/change-name", response_class=HTMLResponse)
+async def user_change_name_ui(
+    request: Request,
+    user_id: int = Form(...),
+    pin: str = Form(...),
+    new_name: str = Form(...)
+):
+    """Allows kids/family members to change their own profile name after confirming their PIN."""
+    new_name_stripped = new_name.strip()
+    if not new_name_stripped:
+        return HTMLResponse(content='<div class="alert alert-error">Name cannot be empty.</div>', status_code=400)
+        
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, pin_hash FROM users WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
+        
+        if not user or hash_pin(pin) != user["pin_hash"]:
+            return HTMLResponse(content='<div class="alert alert-error">Incorrect PIN.</div>', status_code=401)
+            
+        try:
+            cursor.execute("UPDATE users SET name = ? WHERE id = ?", (new_name_stripped, user_id))
+            conn.commit()
+            return render_dashboard(request, user_id, cursor, message=f"Name updated to '{new_name_stripped}' successfully!")
+        except Exception as e:
+            return HTMLResponse(content=f"Error changing name: {str(e)}", status_code=500)
+
 
 @app.post("/api/encouragements", response_class=HTMLResponse)
 async def create_encouragement_ui(
@@ -1247,6 +1381,41 @@ async def admin_update_calendar_color(
             "error": err
         })
 
+@app.post("/api/admin/calendars/rename/{calendar_id}", response_class=HTMLResponse)
+async def admin_rename_calendar(
+    request: Request,
+    calendar_id: int,
+    name: str = Form(...)
+):
+    """Renames a Google Calendar connection."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "UPDATE google_calendars SET name = ? WHERE id = ?",
+                (name, calendar_id)
+            )
+            conn.commit()
+            # Invalidate calendar cache
+            global CALENDAR_CACHE
+            CALENDAR_CACHE["last_fetched"] = None
+            msg = "Updated calendar name."
+            err = None
+        except Exception as e:
+            msg = None
+            err = f"Database error: {str(e)}"
+            
+        users, chores, transactions, google_calendars, announcements = get_admin_data(cursor)
+        return templates.TemplateResponse(request, "admin_snippet.html", {
+            "users": users,
+            "chores": chores,
+            "transactions": transactions,
+            "google_calendars": google_calendars,
+            "announcements": announcements,
+            "message": msg,
+            "error": err
+        })
+
 # --- JSON API Endpoints ---
 
 @app.on_event("startup")
@@ -1288,7 +1457,10 @@ def complete_chore(request: ChoreCompleteRequest):
             raise HTTPException(status_code=404, detail="Chore not found")
         try:
             cursor.execute("BEGIN TRANSACTION;")
-            cursor.execute("INSERT INTO chore_logs (chore_id, user_id) VALUES (?, ?)", (request.chore_id, request.user_id))
+            cursor.execute(
+                "INSERT INTO chore_logs (chore_id, user_id, action_type, credits_delta) VALUES (?, ?, 'earn', ?)", 
+                (request.chore_id, request.user_id, chore["value_credits"])
+            )
             cursor.execute("UPDATE users SET token_balance = token_balance + ? WHERE id = ?", (chore["value_credits"], request.user_id))
             conn.commit()
             cursor.execute("SELECT token_balance FROM users WHERE id = ?", (request.user_id,))
@@ -1402,6 +1574,290 @@ async def acknowledge_announcements(
             logger.error(f"Error acknowledging announcements: {e}")
             
         return render_dashboard(request, user_id, cursor)
+
+# --- Admin Audit Portal Endpoints ---
+
+@app.get("/api/admin/audit/query", response_class=HTMLResponse)
+async def admin_audit_query(
+    request: Request,
+    page: int = 1,
+    days: Optional[str] = "30",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    user_id: Optional[str] = None,
+    chore_id: Optional[str] = None,
+    message: Optional[str] = None,
+    error: Optional[str] = None
+):
+    import math
+    page_size = 10
+    
+    # Parse parameter values cleanly from strings to prevent 422 validation errors on empty inputs
+    parsed_days = 30
+    if days and str(days).strip().isdigit():
+        parsed_days = int(days)
+        
+    parsed_user_id = None
+    if user_id and str(user_id).strip().isdigit():
+        parsed_user_id = int(user_id)
+        
+    parsed_chore_id = None
+    if chore_id and str(chore_id).strip().isdigit():
+        parsed_chore_id = int(chore_id)
+
+    # Clean up empty strings from query parameters
+    if start_date == "": start_date = None
+    if end_date == "": end_date = None
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # 1. Fetch metadata for filters
+        cursor.execute("SELECT id, name FROM users ORDER BY name")
+        all_users = cursor.fetchall()
+        
+        cursor.execute("SELECT id, title FROM chores ORDER BY title")
+        all_chores = cursor.fetchall()
+        
+        cursor.execute("SELECT id, name FROM users WHERE is_parent = 1 ORDER BY name")
+        admin_users = cursor.fetchall()
+        
+        # 2. Build where clauses for filtering chore logs
+        where_clauses = []
+        query_params = []
+        
+        if parsed_user_id is not None:
+            where_clauses.append("l.user_id = ?")
+            query_params.append(parsed_user_id)
+            
+        if parsed_chore_id is not None:
+            where_clauses.append("l.chore_id = ?")
+            query_params.append(parsed_chore_id)
+            
+        if start_date is not None:
+            where_clauses.append("l.completed_at >= ?")
+            query_params.append(f"{start_date} 00:00:00")
+            
+        if end_date is not None:
+            where_clauses.append("l.completed_at <= ?")
+            query_params.append(f"{end_date} 23:59:59")
+            
+        if start_date is None and end_date is None and parsed_days is not None:
+            where_clauses.append("l.completed_at >= datetime('now', '-' || ? || ' days')")
+            query_params.append(str(parsed_days))
+            
+        where_str = ""
+        if where_clauses:
+            where_str = "AND " + " AND ".join(where_clauses)
+            
+        # 3. Get total count for pagination
+        count_query = f"""
+            SELECT COUNT(*) 
+            FROM chore_logs l 
+            JOIN chores c ON l.chore_id = c.id
+            JOIN users u ON l.user_id = u.id
+            WHERE 1=1 {where_str}
+        """
+        cursor.execute(count_query, query_params)
+        total_count = cursor.fetchone()[0]
+        
+        total_pages = max(1, math.ceil(total_count / page_size))
+        current_page = max(1, min(page, total_pages))
+        offset = (current_page - 1) * page_size
+        
+        # 4. Fetch the paginated rows
+        data_query = f"""
+            SELECT 
+                l.id as log_id,
+                l.chore_id,
+                l.user_id,
+                l.action_type,
+                l.credits_delta,
+                l.completed_at,
+                l.admin_note,
+                c.title as chore_title,
+                u.name as user_name
+            FROM chore_logs l
+            JOIN chores c ON l.chore_id = c.id
+            JOIN users u ON l.user_id = u.id
+            WHERE 1=1 {where_str}
+            ORDER BY l.completed_at DESC
+            LIMIT ? OFFSET ?
+        """
+        cursor.execute(data_query, query_params + [page_size, offset])
+        logs = cursor.fetchall()
+        
+        logs_list = []
+        for log in logs:
+            l_dict = dict(log)
+            l_dict["completed_at"] = format_to_central_datetime(log["completed_at"])
+            logs_list.append(l_dict)
+            
+        # 5. Fetch recent admin audit logs (trail)
+        cursor.execute("""
+            SELECT a.id, a.action_type, a.details, a.created_at, u.name as admin_name 
+            FROM admin_audit_logs a 
+            JOIN users u ON a.admin_id = u.id 
+            ORDER BY a.created_at DESC 
+            LIMIT 15
+        """)
+        audit_trail = cursor.fetchall()
+        audit_trail_list = []
+        for trail in audit_trail:
+            t_dict = dict(trail)
+            t_dict["created_at"] = format_to_central_datetime(trail["created_at"])
+            audit_trail_list.append(t_dict)
+            
+        return templates.TemplateResponse(request, "admin_audit_snippet.html", {
+            "logs": logs_list,
+            "all_users": all_users,
+            "all_chores": all_chores,
+            "admin_users": admin_users,
+            "audit_trail": audit_trail_list,
+            "page": current_page,
+            "total_pages": total_pages,
+            "total_count": total_count,
+            "days": parsed_days,
+            "start_date": start_date or "",
+            "end_date": end_date or "",
+            "user_id": parsed_user_id or "",
+            "chore_id": parsed_chore_id or "",
+            "message": message,
+            "error": error
+        })
+
+@app.post("/api/admin/audit/remediate", response_class=HTMLResponse)
+async def admin_audit_remediate(
+    request: Request,
+    action_type: str = Form(...),
+    log_id: int = Form(...),
+    admin_user_id: int = Form(...),
+    admin_pin: str = Form(...),
+    new_user_id: Optional[str] = Form(None),
+    admin_note: Optional[str] = Form(None),
+    page: int = Form(1),
+    days: Optional[str] = Form("30"),
+    start_date: Optional[str] = Form(None),
+    end_date: Optional[str] = Form(None),
+    filter_user_id: Optional[str] = Form(None),
+    filter_chore_id: Optional[str] = Form(None)
+):
+    hashed_pin = hash_pin(admin_pin)
+    message = None
+    error = None
+    
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # 1. Verify Admin PIN
+        cursor.execute("SELECT pin_hash, name FROM users WHERE id = ? AND is_parent = 1", (admin_user_id,))
+        admin = cursor.fetchone()
+        
+        if not admin or admin["pin_hash"] != hashed_pin:
+            # Re-fetch page to render with error
+            error = "Invalid Admin PIN. Remediation action unauthorized."
+        else:
+            try:
+                cursor.execute("BEGIN TRANSACTION;")
+                
+                # Fetch target log entry
+                cursor.execute("""
+                    SELECT l.id, l.chore_id, l.user_id, l.action_type, l.credits_delta, c.title as chore_title, u.name as user_name
+                    FROM chore_logs l
+                    JOIN chores c ON l.chore_id = c.id
+                    JOIN users u ON l.user_id = u.id
+                    WHERE l.id = ?
+                """, (log_id,))
+                log_entry = cursor.fetchone()
+                
+                if not log_entry:
+                    raise Exception("Chore completion log entry not found.")
+                
+                if action_type == "undo":
+                    if log_entry["action_type"] == "undo":
+                        raise Exception("This chore completion has already been undone.")
+                        
+                    # Revert credits balance
+                    cursor.execute("UPDATE users SET token_balance = token_balance - ? WHERE id = ?", (log_entry["credits_delta"], log_entry["user_id"]))
+                    # Log deduction transaction
+                    cursor.execute(
+                        "INSERT INTO token_transactions (user_id, amount, category, description) VALUES (?, ?, 'spend', ?)",
+                        (log_entry["user_id"], -log_entry["credits_delta"], f"Reversal of chore '{log_entry['chore_title']}' by Admin {admin['name']}.")
+                    )
+                    # Update log status to undo
+                    cursor.execute("UPDATE chore_logs SET action_type = 'undo', admin_note = ? WHERE id = ?", (admin_note or "Undone by admin", log_id))
+                    
+                    # Log to audit trail
+                    details = f"Reversed completion of chore '{log_entry['chore_title']}' for {log_entry['user_name']}. Deducted {log_entry['credits_delta']} credits."
+                    cursor.execute("INSERT INTO admin_audit_logs (admin_id, action_type, details) VALUES (?, 'undo', ?)", (admin_user_id, details))
+                    
+                    conn.commit()
+                    message = f"Successfully reversed chore completion for {log_entry['user_name']}."
+                    
+                elif action_type == "reassign":
+                    if not new_user_id or not str(new_user_id).strip().isdigit():
+                        raise Exception("New assignee must be selected for reassignment.")
+                    
+                    parsed_new_user_id = int(new_user_id)
+                    cursor.execute("SELECT name FROM users WHERE id = ?", (parsed_new_user_id,))
+                    new_user = cursor.fetchone()
+                    if not new_user:
+                        raise Exception("New assignee not found.")
+                        
+                    if parsed_new_user_id == log_entry["user_id"]:
+                        raise Exception("Chore is already assigned to this user.")
+                        
+                    # 1. Deduct credits from old user
+                    cursor.execute("UPDATE users SET token_balance = token_balance - ? WHERE id = ?", (log_entry["credits_delta"], log_entry["user_id"]))
+                    cursor.execute(
+                        "INSERT INTO token_transactions (user_id, amount, category, description) VALUES (?, ?, 'spend', ?)",
+                        (log_entry["user_id"], -log_entry["credits_delta"], f"Reassignment of chore '{log_entry['chore_title']}' to {new_user['name']} by Admin {admin['name']}.")
+                    )
+                    
+                    # 2. Add credits to new user
+                    cursor.execute("UPDATE users SET token_balance = token_balance + ? WHERE id = ?", (log_entry["credits_delta"], parsed_new_user_id))
+                    cursor.execute(
+                        "INSERT INTO token_transactions (user_id, amount, category, description) VALUES (?, ?, 'adjust', ?)",
+                        (parsed_new_user_id, log_entry["credits_delta"], f"Assigned chore completion '{log_entry['chore_title']}' from {log_entry['user_name']} by Admin {admin['name']}.")
+                    )
+                    
+                    # 3. Update log record with new user_id and note
+                    cursor.execute("UPDATE chore_logs SET user_id = ?, admin_note = ? WHERE id = ?", (parsed_new_user_id, admin_note or f"Reassigned from {log_entry['user_name']}", log_id))
+                    
+                    # 4. Log to audit trail
+                    details = f"Reassigned chore '{log_entry['chore_title']}' completion from {log_entry['user_name']} to {new_user['name']}. Transferred {log_entry['credits_delta']} credits."
+                    cursor.execute("INSERT INTO admin_audit_logs (admin_id, action_type, details) VALUES (?, 'reassign', ?)", (admin_user_id, details))
+                    
+                    conn.commit()
+                    message = f"Successfully reassigned chore from {log_entry['user_name']} to {new_user['name']}."
+                    
+                elif action_type == "comment":
+                    # Update comment on log
+                    cursor.execute("UPDATE chore_logs SET admin_note = ? WHERE id = ?", (admin_note or "", log_id))
+                    
+                    # Log to audit trail
+                    details = f"Added admin note to chore '{log_entry['chore_title']}' log for {log_entry['user_name']}: '{admin_note}'"
+                    cursor.execute("INSERT INTO admin_audit_logs (admin_id, action_type, details) VALUES (?, 'comment', ?)", (admin_user_id, details))
+                    
+                    conn.commit()
+                    message = "Admin note updated successfully."
+                    
+            except Exception as e:
+                conn.rollback()
+                error = f"Remediation failed: {str(e)}"
+                
+    # Return updated query results using the query helper
+    return await admin_audit_query(
+        request=request,
+        page=page,
+        days=days,
+        start_date=start_date,
+        end_date=end_date,
+        user_id=filter_user_id,
+        chore_id=filter_chore_id,
+        message=message,
+        error=error
+    )
 
 if __name__ == "__main__":
     import uvicorn
