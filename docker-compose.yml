@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -21,11 +19,7 @@ services:
     networks:
       - hearth_net
 
-
-
-volumes:
-  data_storage:
-
 networks:
   hearth_net:
     driver: bridge
+
