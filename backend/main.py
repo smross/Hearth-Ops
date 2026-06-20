@@ -763,7 +763,7 @@ def render_dashboard(request: Request, user_id: int, cursor, message: Optional[s
         )
         ORDER BY c.category, c.title
         """,
-        (current_hour, user_id, user_id, user_id, user_id)
+        (current_hour, user_id, user_id, user_id)
     )
     available_chores = cursor.fetchall()
 

@@ -16,6 +16,11 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:////app/data/hearth.db")
 # Extract the file path from the sqlite://// format
 DB_PATH = DATABASE_URL.replace("sqlite:///", "")
 
+def set_db_path(new_path: str):
+    """Overrides the active DB path, useful for sandboxed database testing."""
+    global DB_PATH
+    DB_PATH = new_path
+
 def init_db():
     """
     Initializes the database if it doesn't exist by running the schema.sql script.
