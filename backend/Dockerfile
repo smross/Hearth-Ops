@@ -18,6 +18,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the backend code
 COPY . .
 
+# Create a system user/group and set owner on the app directory
+RUN groupadd -g 10001 hearthgroup && \
+    useradd -u 10001 -g hearthgroup -d /app -s /sbin/nologin hearthuser && \
+    chown -R hearthuser:hearthgroup /app
+
+# Switch to non-root user
+USER hearthuser
+
 # Expose the port the app runs on
 EXPOSE 8000
 

@@ -4,6 +4,8 @@ import hashlib
 import requests
 import datetime
 import random
+import threading
+import time
 from typing import Optional, List
 from pydantic import BaseModel
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Form
@@ -13,7 +15,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from icalendar import Calendar
 import recurring_ical_events
-from database import init_db, get_db_connection
+from database import init_db, get_db_connection, DB_PATH
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -277,9 +279,27 @@ app = FastAPI(
 )
 
 # Configure CORS
+# Restrict origins in production to secure local network environments
+origins = [
+    "http://localhost",
+    "http://localhost:8000",
+    "http://localhost:8001",
+    "http://127.0.0.1",
+    "http://127.0.0.1:8000",
+    "http://127.0.0.1:8001",
+]
+
+# Add production server host IP (default 192.168.40.21)
+PROD_IP = os.getenv("PROD_SERVER_IP", "192.168.40.21")
+origins.extend([
+    f"http://{PROD_IP}",
+    f"http://{PROD_IP}:8000",
+    f"http://{PROD_IP}:8001",
+])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -295,8 +315,6 @@ if os.path.exists(os.path.join(CURRENT_DIR, "..", "frontend")):
 else:
     # Docker or alternative structure where frontend might be a sibling in the same dir
     FRONTEND_DIR = os.path.join(CURRENT_DIR, "frontend")
-
-import random
 
 templates = Jinja2Templates(directory=os.path.join(FRONTEND_DIR, "templates"))
 
@@ -1423,6 +1441,29 @@ def startup_event():
     """Actions to run on server startup."""
     logger.info("Starting up HearthOps API...")
     init_db()
+    
+    # Import backup helper here to avoid circular imports if any
+    from backup import run_backup
+    
+    def schedule_backups():
+        """Background daemon thread function to run SQLite backups every 24 hours."""
+        # Wait a brief moment to ensure startup finishes cleanly
+        time.sleep(5)
+        db_dir = os.path.dirname(DB_PATH)
+        backup_dir = os.path.join(db_dir, "backups")
+        
+        while True:
+            try:
+                logger.info("Triggering scheduled background database backup...")
+                run_backup(DB_PATH, backup_dir)
+            except Exception as e:
+                logger.error(f"Error during scheduled database backup: {e}")
+            # Sleep for 24 hours
+            time.sleep(86400)
+            
+    backup_thread = threading.Thread(target=schedule_backups, daemon=True)
+    backup_thread.start()
+    logger.info("Database backup scheduler thread initialized.")
 
 @app.get("/health")
 def health_check():
@@ -1862,4 +1903,5 @@ async def admin_audit_remediate(
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("APP_PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    is_reload = os.getenv("APP_ENV", "production").lower() != "production"
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=is_reload)
