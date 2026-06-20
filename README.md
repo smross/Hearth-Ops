@@ -40,3 +40,15 @@ hearth-ops/
 
 *   **Zero-Cloud PII:** Family identities, performance histories, and ledger transaction accounts are strictly maintained inside the local SQLite database.
 *   **Credential Isolation:** System configurations, passwords, and calendar links reside inside a local `.env` runtime context to protect private data.
+
+---
+
+## 🧪 Testing & Validation
+
+The backend includes an automated sandboxed test suite using `pytest`, `freezegun` (for clock-travel tests), and `BeautifulSoup` (for HTML output validation). The tests run in an isolated environment against a temporary SQLite database (`test_sandbox_hearth.db`), leaving the active databases completely untouched.
+
+To run the test suite inside the containerized environment:
+```bash
+docker compose exec backend pytest test_suite.py
+```
+
