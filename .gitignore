@@ -184,3 +184,5 @@ ehthumbs_vista.db
 # Local Configuration (Anonymization helper)
 family_members.json
 backend/family_members.json
+.env
+
