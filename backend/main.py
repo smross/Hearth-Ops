@@ -415,15 +415,24 @@ async def index(request: Request):
         )
         active_announcements = cursor.fetchall()
 
-        # Leaderboard (Top earners in last 7 days)
+        # Leaderboard (Top earners in last 7 days, including manual adjustments)
         cursor.execute(
             """
-            SELECT u.name, SUM(c.value_credits) as total_earned
+            SELECT u.name, SUM(e.earned_points) as total_earned
             FROM users u
-            JOIN chore_logs l ON u.id = l.user_id
-            JOIN chores c ON l.chore_id = c.id
-            WHERE l.action_type = 'earn'
-            AND date(l.completed_at, 'localtime') >= date('now', '-7 days', 'localtime')
+            JOIN (
+                SELECT user_id, c.value_credits AS earned_points, l.completed_at
+                FROM chore_logs l
+                JOIN chores c ON l.chore_id = c.id
+                WHERE l.action_type = 'earn'
+                
+                UNION ALL
+                
+                SELECT user_id, amount AS earned_points, created_at AS completed_at
+                FROM token_transactions
+                WHERE category = 'adjust'
+            ) e ON u.id = e.user_id
+            WHERE date(e.completed_at, 'localtime') >= date('now', '-7 days', 'localtime')
             GROUP BY u.id
             ORDER BY total_earned DESC
             """
@@ -732,15 +741,24 @@ def render_dashboard(request: Request, user_id: int, cursor, message: Optional[s
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    # 2. Leaderboard (Top earners in last 7 days)
+    # 2. Leaderboard (Top earners in last 7 days, including manual adjustments)
     cursor.execute(
         """
-        SELECT u.name, SUM(c.value_credits) as total_earned
+        SELECT u.name, SUM(e.earned_points) as total_earned
         FROM users u
-        JOIN chore_logs l ON u.id = l.user_id
-        JOIN chores c ON l.chore_id = c.id
-        WHERE l.action_type = 'earn'
-        AND date(l.completed_at, 'localtime') >= date('now', '-7 days', 'localtime')
+        JOIN (
+            SELECT user_id, c.value_credits AS earned_points, l.completed_at
+            FROM chore_logs l
+            JOIN chores c ON l.chore_id = c.id
+            WHERE l.action_type = 'earn'
+            
+            UNION ALL
+            
+            SELECT user_id, amount AS earned_points, created_at AS completed_at
+            FROM token_transactions
+            WHERE category = 'adjust'
+        ) e ON u.id = e.user_id
+        WHERE date(e.completed_at, 'localtime') >= date('now', '-7 days', 'localtime')
         GROUP BY u.id
         ORDER BY total_earned DESC
         """
