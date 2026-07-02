@@ -58,7 +58,71 @@
         </form>
     </div>
 
-    <!-- 2. Reward Store Management Section (dynamically fetched via templates global) -->
+    <!-- 2. Announcements Management -->
+    <div style="margin-bottom: 32px; background: #f9fafb; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb;">
+        <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">📢 Announcements</h3>
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 16px;">
+            Post messages that appear as alerts on the main page, and as mandatory acknowledgment popups when users log in.
+        </p>
+
+        <!-- Announcements List -->
+        {% if announcements %}
+        <div style="display: grid; gap: 8px; margin-bottom: 20px;">
+            {% for ann in announcements %}
+            <div style="display: flex; justify-content: space-between; align-items: center; background: #ffffff; padding: 12px 16px; border-radius: 8px; border: 1px solid #e5e7eb; border-left: 5px solid {{ '#3b82f6' if ann.is_active else '#9ca3af' }};">
+                <div style="flex-grow: 1; margin-right: 16px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <strong style="color: var(--text);">{{ ann.title }}</strong>
+                        {% if ann.is_active %}
+                        <span style="background: #ecfdf5; color: #047857; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Active</span>
+                        {% else %}
+                        <span style="background: #f3f4f6; color: #4b5563; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Inactive</span>
+                        {% endif %}
+                    </div>
+                    <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-top: 4px;">{{ ann.content }}</span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button 
+                        hx-post="/api/admin/announcements/toggle/{{ ann.id }}"
+                        hx-target="#main-content"
+                        onclick="window.sessionStorage.setItem('adminScroll', window.scrollY)"
+                        style="width: auto; padding: 6px 12px; font-size: 0.8rem; background-color: {% if ann.is_active %}var(--text-muted){% else %}var(--success){% endif %};"
+                    >
+                        {% if ann.is_active %}Deactivate{% else %}Activate{% endif %}
+                    </button>
+                    <button 
+                        hx-post="/api/admin/announcements/delete/{{ ann.id }}"
+                        hx-target="#main-content"
+                        onclick="if(!confirm('Delete this announcement?')) return false; window.sessionStorage.setItem('adminScroll', window.scrollY)"
+                        style="width: auto; padding: 6px 12px; font-size: 0.8rem; background-color: var(--error);"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="font-style: italic; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 20px;">No announcements posted yet.</p>
+        {% endif %}
+
+        <!-- Create Announcement Form -->
+        <form hx-post="/api/admin/announcements/add" hx-target="#main-content" style="background: #ffffff; padding: 16px; border-radius: 12px; border: 1px solid #e5e7eb; display: grid; gap: 12px;" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
+            <div>
+                <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Announcement Title</label>
+                <input type="text" name="title" placeholder="e.g. Family Meeting Tonight" required style="width: 100%; padding: 8px; font-size: 0.9rem; height: 38px;">
+            </div>
+            <div>
+                <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Announcement Message / Instructions</label>
+                <textarea name="content" placeholder="e.g. Please finish all your chores before 6:00 PM for movie night prep." required style="width: 100%; padding: 8px; font-size: 0.9rem; height: 80px; font-family: inherit; resize: none;"></textarea>
+            </div>
+            <button type="submit" style="padding: 10px; background-color: var(--primary); color: white; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                Post Announcement
+            </button>
+        </form>
+    </div>
+
+    <!-- 3. Reward Store Management Section (dynamically fetched via templates global) -->
     {% set rewards_list = get_all_rewards() %}
     <div style="margin-bottom: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
@@ -125,7 +189,7 @@
         </div>
     </div>
 
-    <!-- 3. Family Ledger & Account Actions -->
+    <!-- 4. Family Ledger & Account Actions -->
     <div style="margin-bottom: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px;">
         <h3 style="margin-top: 0;">Family Ledger & Account Actions</h3>
         <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
@@ -195,7 +259,7 @@
         </table>
     </div>
 
-    <!-- 4. Recent Transactions Audit Log -->
+    <!-- 5. Recent Transactions Audit Log -->
     {% if transactions %}
     <div style="margin-bottom: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px;">
         <h3 style="margin-top: 0;">Transaction Audit History</h3>
@@ -218,7 +282,7 @@
     </div>
     {% endif %}
 
-    <!-- 5. Chore Management -->
+    <!-- 6. Chore Management -->
     <div style="margin-bottom: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <h3 style="margin-top: 0;">Chore Management</h3>
@@ -322,7 +386,7 @@
         </div>
     </div>
 
-    <!-- 6. Google Calendar Connection Management -->
+    <!-- 7. Google Calendar Connection Management -->
     <div style="margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px; margin-bottom: 16px;">
         <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">📅 Google Calendar Connections</h3>
         <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 16px;">
@@ -431,69 +495,6 @@
         </form>
     </div>
 
-    <!-- 7. Announcements Management -->
-    <div style="margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px; margin-bottom: 16px;">
-        <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">📢 Announcements</h3>
-        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 16px;">
-            Post messages that appear as alerts on the main page, and as mandatory acknowledgment popups when users log in.
-        </p>
-
-        <!-- Announcements List -->
-        {% if announcements %}
-        <div style="display: grid; gap: 8px; margin-bottom: 20px;">
-            {% for ann in announcements %}
-            <div style="display: flex; justify-content: space-between; align-items: center; background: #f9fafb; padding: 12px 16px; border-radius: 8px; border: 1px solid #e5e7eb; border-left: 5px solid {{ '#3b82f6' if ann.is_active else '#9ca3af' }};">
-                <div style="flex-grow: 1; margin-right: 16px;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <strong style="color: var(--text);">{{ ann.title }}</strong>
-                        {% if ann.is_active %}
-                        <span style="background: #ecfdf5; color: #047857; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Active</span>
-                        {% else %}
-                        <span style="background: #f3f4f6; color: #4b5563; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Inactive</span>
-                        {% endif %}
-                    </div>
-                    <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-top: 4px;">{{ ann.content }}</span>
-                </div>
-                <div style="display: flex; gap: 8px;">
-                    <button 
-                        hx-post="/api/admin/announcements/toggle/{{ ann.id }}"
-                        hx-target="#main-content"
-                        onclick="window.sessionStorage.setItem('adminScroll', window.scrollY)"
-                        style="width: auto; padding: 6px 12px; font-size: 0.8rem; background-color: {% if ann.is_active %}var(--text-muted){% else %}var(--success){% endif %};"
-                    >
-                        {% if ann.is_active %}Deactivate{% else %}Activate{% endif %}
-                    </button>
-                    <button 
-                        hx-post="/api/admin/announcements/delete/{{ ann.id }}"
-                        hx-target="#main-content"
-                        onclick="if(!confirm('Delete this announcement?')) return false; window.sessionStorage.setItem('adminScroll', window.scrollY)"
-                        style="width: auto; padding: 6px 12px; font-size: 0.8rem; background-color: var(--error);"
-                    >
-                        Delete
-                    </button>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p style="font-style: italic; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 20px;">No announcements posted yet.</p>
-        {% endif %}
-
-        <!-- Create Announcement Form -->
-        <form hx-post="/api/admin/announcements/add" hx-target="#main-content" style="background: #f9fafb; padding: 16px; border-radius: 12px; border: 1px solid #e5e7eb; display: grid; gap: 12px;" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
-            <div>
-                <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Announcement Title</label>
-                <input type="text" name="title" placeholder="e.g. Family Meeting Tonight" required style="width: 100%; padding: 8px; font-size: 0.9rem; height: 38px;">
-            </div>
-            <div>
-                <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Announcement Message / Instructions</label>
-                <textarea name="content" placeholder="e.g. Please finish all your chores before 6:00 PM for movie night prep." required style="width: 100%; padding: 8px; font-size: 0.9rem; height: 80px; font-family: inherit; resize: none;"></textarea>
-            </div>
-            <button type="submit" style="padding: 10px; background-color: var(--primary); color: white; border-radius: 6px; font-weight: 600; cursor: pointer;">
-                Post Announcement
-            </button>
-        </form>
-    </div>
 
     <!-- 8. Admin Audit Portal -->
     <div style="margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px; margin-bottom: 16px;">
