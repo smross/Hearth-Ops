@@ -1,8 +1,8 @@
 services:
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: hearth-ops-${APP_ENV:-production}-backend
     restart: unless-stopped
     ports:

@@ -10,13 +10,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file into the container
-COPY requirements.txt .
+COPY backend/requirements.txt .
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the backend code
-COPY . .
+# Copy the rest of the backend and frontend code
+COPY backend/ .
+COPY frontend/ ./frontend/
 
 # Create a system user/group and set owner on the app directory
 RUN groupadd -g 10001 hearthgroup && \
