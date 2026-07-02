@@ -77,4 +77,43 @@ HearthOps is backed by a local SQLite database that maintains family ledger inte
 - `id`: INTEGER, Primary Key, Auto-increment.
 - `admin_id`: INTEGER, Foreign Key to `users.id` ON DELETE CASCADE.
 - `action_type`: TEXT, NOT NULL (`'undo'`, `'reassign'`, `'comment'`).
-- `details`: TEXT, NOT NULL.
+- `details`: TEXT, NOT NULL.
+
+### 11. `rewards` (Rewards Store Menu)
+- `id`: INTEGER, Primary Key, Auto-increment.
+- `title`: TEXT, NOT NULL.
+- `description`: TEXT.
+- `cost_points`: REAL, NOT NULL.
+- `tier`: INTEGER, NOT NULL.
+- `is_active`: INTEGER, default `1` (1 = active, 0 = disabled).
+
+## 🏆 Reward Tiers & Ratio Mechanics
+
+The HearthOps economy uses a **100 points baseline** ratio system.
+
+### 1. Ratio Baseline
+- **Standard Daily Chore**: 25 - 50 points (e.g., clear place, unload dishwasher, tidy great room).
+- **Deep Weekly Chore**: 200 - 500 points (e.g., deep clean bathrooms, scrub showers, lawn maintenance).
+
+### 2. Tier 1 (Screen Time & Network)
+- **30 Mins Xbox/PC**: 50 pts
+- **60 Mins Unrestricted Phone**: 100 pts
+- **'Lag-Free' Priority Pass**: 150 pts
+- **Plume Network Profile Boost (1 Hour)**: 150 pts
+
+### 3. Tier 2 (Privileges & Passes)
+- **Pick Family Movie Night**: 150 pts
+- **Pick Family Dessert**: 100 pts
+- **Pick Family Dinner Menu**: 300 pts
+- **'Get Out of Jail Free' Chore Pass**: 500 pts
+  - *Allows skipping a task and routing it to a sibling or a bounty pool.*
+
+### 4. Tier 3 (Quality Time & Outings)
+- **'QT Cone' Ice Cream Run with Mom/Dad**: 400 pts
+- **Late-Night Passenger (Stay up 1 hour late on weekend)**: 250 pts
+- **Chesterfield Valley Excursion (2-hour weekend outing)**: 800 pts
+
+### 5. ADHD System Modifiers
+- **'Early Bird' Modifier**: +10% points for chores completed before 9:00 AM.
+- **Streak Boosts**: Additional points for daily completion streaks.
+- **Sibling Bounty Board**: Siblings can complete expired chores for 1.5x points (points are deducted from the target child's potential balance).

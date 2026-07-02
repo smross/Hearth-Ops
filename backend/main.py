@@ -328,6 +328,14 @@ def jinja_shuffle(l):
 
 templates.env.filters["shuffle"] = jinja_shuffle
 templates.env.globals["app_env"] = os.getenv("APP_ENV", "production")
+
+def get_all_rewards():
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, title, description, cost_points, tier, is_active FROM rewards ORDER BY tier, cost_points")
+        return [dict(r) for r in cursor.fetchall()]
+
+templates.env.globals["get_all_rewards"] = get_all_rewards
 app.mount("/static", StaticFiles(directory=os.path.join(FRONTEND_DIR, "static")), name="static")
 
 # --- Models ---
@@ -345,6 +353,23 @@ class ChoreCompleteRequest(BaseModel):
     chore_id: int
     user_id: int
     pin: str
+
+class RewardResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str]
+    cost_points: float
+    tier: int
+
+class RedeemRequest(BaseModel):
+    user_id: int
+    reward_id: int
+    pin: str
+
+class RedeemResponse(BaseModel):
+    status: str
+    new_balance: float
+    transaction_id: int
 
 # --- Utilities ---
 
@@ -878,6 +903,28 @@ def render_dashboard(request: Request, user_id: int, cursor, message: Optional[s
     )
     pending_announcements = cursor.fetchall()
 
+    # Fetch Active Rewards Menu
+    cursor.execute("SELECT id, title, description, cost_points, tier FROM rewards WHERE is_active = 1 ORDER BY tier, cost_points")
+    rewards = cursor.fetchall()
+
+    # Fetch Unified Transaction History
+    cursor.execute(
+        """
+        SELECT 'chore' as type, c.title as description, l.credits_delta as amount, l.completed_at as created_at
+        FROM chore_logs l
+        JOIN chores c ON l.chore_id = c.id
+        WHERE l.user_id = ? AND l.action_type = 'earn'
+        UNION ALL
+        SELECT 'reward' as type, description, amount, created_at
+        FROM token_transactions
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 10
+        """,
+        (user_id, user_id)
+    )
+    transactions = cursor.fetchall()
+
     return templates.TemplateResponse(request, "dashboard_snippet.html", {
         "user": user, 
         "chores": available_list,
@@ -889,6 +936,8 @@ def render_dashboard(request: Request, user_id: int, cursor, message: Optional[s
         "encouragements": encouragements_list,
         "has_new_encouragement": has_new_encouragement,
         "pending_announcements": pending_announcements,
+        "rewards": rewards,
+        "transactions": transactions,
         "message": message,
         "error": error
     })
@@ -1899,6 +1948,154 @@ async def admin_audit_remediate(
         message=message,
         error=error
     )
+
+@app.post("/api/rewards/redeem-ui", response_class=HTMLResponse)
+async def redeem_reward_ui(
+    request: Request,
+    reward_id: int = Form(...),
+    user_id: int = Form(...)
+):
+    """Handles reward redemption from the UI via HTMX prompt."""
+    pin = request.headers.get("HX-Prompt")
+    
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, pin_hash, token_balance FROM users WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
+        
+        if not user:
+            return HTMLResponse(content='<div class="alert alert-error">User not found.</div>', status_code=404)
+            
+        if not pin or hash_pin(pin) != user["pin_hash"]:
+             return HTMLResponse(content='<div class="alert alert-error">Invalid PIN.</div>', status_code=401)
+            
+        cursor.execute("SELECT id, title, cost_points FROM rewards WHERE id = ? AND is_active = 1", (reward_id,))
+        reward = cursor.fetchone()
+        if not reward:
+            return HTMLResponse(content='<div class="alert alert-error">Reward not found.</div>', status_code=404)
+            
+        if user["token_balance"] < reward["cost_points"]:
+            return HTMLResponse(content='<div class="alert alert-error">Insufficient tokens.</div>', status_code=400)
+            
+        try:
+            cursor.execute("BEGIN TRANSACTION;")
+            cursor.execute("UPDATE users SET token_balance = token_balance - ? WHERE id = ?", (reward["cost_points"], user_id))
+            cursor.execute(
+                "INSERT INTO token_transactions (user_id, amount, category, description) VALUES (?, ?, 'spend', ?)",
+                (user_id, -reward["cost_points"], f"Redeemed: {reward['title']}")
+            )
+            conn.commit()
+            
+            msg = f"Redeemed {reward['title']} for {reward['cost_points']} credits!"
+            return render_dashboard(request, user_id, cursor, message=msg)
+        except Exception as e:
+            conn.rollback()
+            return HTMLResponse(content=f'<div class="alert alert-error">Error: {str(e)}</div>', status_code=500)
+
+@app.get("/api/rewards", response_model=List[RewardResponse])
+def get_rewards():
+    """Fetches the active rewards menu."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, title, description, cost_points, tier FROM rewards WHERE is_active = 1 ORDER BY tier, cost_points")
+        rewards = cursor.fetchall()
+        return [dict(r) for r in rewards]
+
+@app.post("/api/rewards/redeem", response_model=RedeemResponse)
+def redeem_reward(request: RedeemRequest):
+    """Processes a reward redemption request."""
+    hashed_input = hash_pin(request.pin)
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT pin_hash, token_balance FROM users WHERE id = ?", (request.user_id,))
+        user = cursor.fetchone()
+        if not user or user["pin_hash"] != hashed_input:
+            raise HTTPException(status_code=401, detail="Invalid PIN")
+            
+        cursor.execute("SELECT title, cost_points FROM rewards WHERE id = ? AND is_active = 1", (request.reward_id,))
+        reward = cursor.fetchone()
+        if not reward:
+            raise HTTPException(status_code=404, detail="Reward not found")
+            
+        if user["token_balance"] < reward["cost_points"]:
+            raise HTTPException(status_code=400, detail="Insufficient tokens")
+            
+        try:
+            cursor.execute("BEGIN TRANSACTION;")
+            cursor.execute("UPDATE users SET token_balance = token_balance - ? WHERE id = ?", (reward["cost_points"], request.user_id))
+            cursor.execute(
+                "INSERT INTO token_transactions (user_id, amount, category, description) VALUES (?, ?, 'spend', ?)",
+                (request.user_id, -reward["cost_points"], f"Redeemed: {reward['title']}")
+            )
+            tx_id = cursor.lastrowid
+            conn.commit()
+            
+            cursor.execute("SELECT token_balance FROM users WHERE id = ?", (request.user_id,))
+            return {
+                "status": "success",
+                "new_balance": cursor.fetchone()["token_balance"],
+                "transaction_id": tx_id
+            }
+        except Exception as e:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/admin/rewards/toggle/{reward_id}", response_class=HTMLResponse)
+async def admin_toggle_reward(request: Request, reward_id: int):
+    """Toggles a reward's active status from the admin panel."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE rewards SET is_active = 1 - is_active WHERE id = ?", (reward_id,))
+        conn.commit()
+        
+        users, chores, transactions, google_calendars, announcements = get_admin_data(cursor)
+        return templates.TemplateResponse(request, "admin_snippet.html", {
+            "users": users,
+            "chores": chores,
+            "transactions": transactions,
+            "google_calendars": google_calendars,
+            "announcements": announcements,
+            "message": "Reward status updated."
+        })
+
+@app.post("/api/admin/rewards/update", response_class=HTMLResponse)
+async def admin_update_reward(
+    request: Request,
+    reward_id: int = Form(...),
+    title: str = Form(...),
+    description: Optional[str] = Form(None),
+    tier: int = Form(...),
+    cost_points: float = Form(...)
+):
+    """Updates a reward's details from the admin panel."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                UPDATE rewards 
+                SET title = ?, description = ?, tier = ?, cost_points = ?
+                WHERE id = ?
+                """,
+                (title, description, tier, cost_points, reward_id)
+            )
+            conn.commit()
+            msg = f"Updated reward: {title}"
+            err = None
+        except Exception as e:
+            msg = None
+            err = f"Error: {str(e)}"
+            
+        users, chores, transactions, google_calendars, announcements = get_admin_data(cursor)
+        return templates.TemplateResponse(request, "admin_snippet.html", {
+            "users": users,
+            "chores": chores,
+            "transactions": transactions,
+            "google_calendars": google_calendars,
+            "announcements": announcements,
+            "message": msg,
+            "error": err
+        })
 
 if __name__ == "__main__":
     import uvicorn

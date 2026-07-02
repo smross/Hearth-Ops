@@ -113,6 +113,16 @@ CREATE TABLE IF NOT EXISTS admin_audit_logs (
     FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- 11. Rewards Store Menu Table
+CREATE TABLE IF NOT EXISTS rewards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    cost_points REAL NOT NULL,
+    tier INTEGER NOT NULL, -- 1, 2, or 3
+    is_active INTEGER DEFAULT 1
+);
+
 -- Indexes for performance tuning and fast UI loads
 CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_admin ON admin_audit_logs(admin_id);
 CREATE INDEX IF NOT EXISTS idx_users_name ON users(name);
@@ -123,5 +133,6 @@ CREATE INDEX IF NOT EXISTS idx_transactions_user ON token_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_encouragements_recipient ON encouragements(recipient_id);
 CREATE INDEX IF NOT EXISTS idx_announcements_active ON announcements(is_active);
 CREATE INDEX IF NOT EXISTS idx_acknowledgments_user ON announcement_acknowledgments(user_id);
+CREATE INDEX IF NOT EXISTS idx_rewards_tier ON rewards(tier);
 
 

@@ -30,9 +30,9 @@ This file tracks the active deployment state of the HearthOps monorepo. Use this
 - [x] **Task 5.5:** Run `docker-compose up --build` to confirm the containerized environment is fully functional.
 
 ## 🟩 Phase 6: Production Hardening & Feature Expansion (Next)
-- [ ] **Task 6.1:** Implement "Token Redemptions" (Rewards store) for kids to spend their earned credits.
+- [x] **Task 6.1:** Implement "Token Redemptions" (Rewards store) for kids to spend their earned credits.
 - [ ] **Task 6.2:** Configure Pi-hole API hooks to toggle internet access based on chore completion status.
-- [ ] **Task 6.3:** Add "Transaction History" view for kids to see their past earned/spent tokens.
+- [x] **Task 6.3:** Add "Transaction History" view for kids to see their past earned/spent tokens.
 
 ## 🟩 Phase 7: Family Announcements Feature
 - [x] **Task 7.1:** Design database schemas for `announcements` and individual user `announcement_acknowledgments`.

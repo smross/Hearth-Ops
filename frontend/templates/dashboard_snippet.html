@@ -217,6 +217,74 @@
                 {% endif %}
             </div>
         </details>
+
+        <!-- Rewards Store Section -->
+        <h3 style="margin: 32px 0 8px 0; font-size: 1rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">🎁 Rewards Store</h3>
+        {% set reward_tiers = rewards | groupby('tier') %}
+        {% for tier, tier_rewards in reward_tiers %}
+        <details class="cat-rewards-tier-{{ tier }}" style="border-left: 4px solid {% if tier == 1 %}#3b82f6{% elif tier == 2 %}#10b981{% else %}#8b5cf6{% endif %};">
+            <summary>
+                <span>
+                    <span class="cat-icon">
+                        {% if tier == 1 %}🎮 Screen & Network
+                        {% elif tier == 2 %}🎟️ Privileges & Passes
+                        {% else %}🍦 Quality Time & Outings{% endif %}
+                    </span>
+                </span>
+                <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-muted); margin-left: auto; margin-right: 12px;">{{ tier_rewards | length }} items</span>
+            </summary>
+            <div class="chore-list">
+                {% for reward in tier_rewards %}
+                <div class="chore-item" style="{% if user.token_balance < reward.cost_points %}opacity: 0.6;{% endif %}">
+                    <div class="chore-info">
+                        <h4 class="chore-title">{{ reward.title }}</h4>
+                        <p class="chore-desc">{{ reward.description }}</p>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                        <div class="chore-value" style="color: var(--error);">🪙 {{ reward.cost_points }}</div>
+                        <button 
+                            class="chore-action-btn"
+                            style="background-color: {% if user.token_balance >= reward.cost_points %}var(--primary){% else %}#d1d5db{% endif %};"
+                            {% if user.token_balance >= reward.cost_points %}
+                            onclick="requestRewardPin('{{ reward.id }}', '{{ reward.title }}', '{{ reward.cost_points }}')"
+                            {% else %}
+                            disabled
+                            {% endif %}
+                        >
+                            Redeem
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </details>
+        {% endfor %}
+
+        <!-- Unified Transaction History Section -->
+        <h3 style="margin: 32px 0 8px 0; font-size: 1rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">📜 Transaction History</h3>
+        <details style="border-left: 4px solid var(--text-muted);">
+            <summary>
+                <span>🔍 Recent Activities</span>
+                <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-muted); margin-left: auto; margin-right: 12px;">Unified Log</span>
+            </summary>
+            <div style="padding: 0 16px 16px 16px;">
+                {% if transactions %}
+                    {% for tx in transactions %}
+                    <div class="leaderboard-item" style="border-bottom: 1px solid #f3f4f6; padding: 10px 0; font-size: 0.95rem;">
+                        <div style="flex-grow: 1;">
+                            <span style="font-weight: 600; color: #374151;">{{ tx.description }}</span>
+                            <span style="display: block; font-size: 0.75rem; color: var(--text-muted);">{{ tx.created_at }}</span>
+                        </div>
+                        <span style="font-weight: 700; color: {% if tx.amount < 0 %}var(--error){% else %}var(--success){% endif %};">
+                            {% if tx.amount < 0 %}🪙 {{ tx.amount }}{% else %}+🪙 {{ tx.amount }}{% endif %}
+                        </span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p style="text-align: center; color: var(--text-muted); font-size: 0.9rem; padding: 16px 0; margin: 0;">No transactions yet. Complete chores to earn tokens!</p>
+                {% endif %}
+            </div>
+        </details>
     </div>
 
 </div>
@@ -256,6 +324,26 @@
                 <button type="button" id="submit-undo-btn" style="background-color: var(--error);">UNDO</button>
             </div>
             <button type="button" onclick="hideUndoModal()" style="margin-top: 16px; background: none; color: var(--text-muted); padding: 8px;">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Reward Redemption Modal -->
+    <div id="reward-modal" class="overlay">
+        <div class="modal">
+            <h3 id="modal-reward-title" style="text-align: center; margin-top: 0;">Redeem Reward</h3>
+            <p id="modal-reward-cost" style="text-align: center; color: var(--error); font-weight: 700; margin: 0 0 16px 0;"></p>
+            <p style="text-align: center; color: var(--text-muted); font-size: 0.9rem;">Enter PIN to authorize purchase:</p>
+            <input type="password" id="reward-pin-input" readonly 
+                   style="text-align: center; font-size: 2rem; letter-spacing: 0.5rem; height: 60px; margin-bottom: 16px;">
+            <div class="pin-grid">
+                {% for i in range(1, 10) %}
+                <button type="button" class="pin-btn" onclick="addRewardPin('{{ i }}')">{{ i }}</button>
+                {% endfor %}
+                <button type="button" class="pin-btn" onclick="clearRewardPin()" style="color: var(--error);">C</button>
+                <button type="button" class="pin-btn" onclick="addRewardPin('0')">{{ 0 }}</button>
+                <button type="button" id="submit-reward-btn" style="background-color: var(--success);">REDEEM</button>
+            </div>
+            <button type="button" onclick="hideRewardModal()" style="margin-top: 16px; background: none; color: var(--text-muted); padding: 8px;">Cancel</button>
         </div>
     </div>
 
@@ -393,6 +481,45 @@
         function hideChangeNameModal() {
             document.getElementById('change-name-modal').classList.remove('active');
         }
+
+        // Reward mechanisms
+        var currentRewardId = null;
+
+        function requestRewardPin(id, title, cost) {
+            currentRewardId = id;
+            document.getElementById('modal-reward-title').innerText = "Redeem: " + title;
+            document.getElementById('modal-reward-cost').innerText = "Cost: 🪙 " + cost;
+            document.getElementById('reward-modal').classList.add('active');
+            document.getElementById('reward-pin-input').value = '';
+        }
+
+        function hideRewardModal() {
+            document.getElementById('reward-modal').classList.remove('active');
+        }
+
+        function addRewardPin(num) {
+            const input = document.getElementById('reward-pin-input');
+            if (input.value.length < 4) input.value += num;
+        }
+
+        function clearRewardPin() {
+            document.getElementById('reward-pin-input').value = '';
+        }
+
+        document.getElementById('submit-reward-btn').onclick = function() {
+            const pin = document.getElementById('reward-pin-input').value;
+            if (pin.length === 4) {
+                htmx.ajax('POST', '/api/rewards/redeem-ui', {
+                    target: '#main-content',
+                    values: {
+                        'reward_id': currentRewardId,
+                        'user_id': '{{ user.id }}'
+                    },
+                    headers: {'HX-Prompt': pin}
+                });
+                hideRewardModal();
+            }
+        };
     </script>
     
     <button onclick="window.location.reload()" style="margin-top: 32px; background-color: var(--text-muted); padding: 12px; font-size: 0.9rem;">Switch User</button>

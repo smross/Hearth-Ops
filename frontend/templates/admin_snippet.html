@@ -28,8 +28,106 @@
     <div class="alert alert-error" style="margin-bottom: 20px;">{{ error }}</div>
     {% endif %}
 
-    <div style="margin-bottom: 32px;">
-        <h3>Family Ledger & Account Actions</h3>
+    <!-- 1. Award Custom Bonus Credits (at the top) -->
+    <div style="margin-bottom: 32px; background: #eff6ff; padding: 20px; border-radius: 12px; border: 1px solid #bfdbfe;">
+        <h3 style="margin-top: 0; color: #1e40af; display: flex; align-items: center; gap: 8px;">✨ Award Custom Bonus Credits</h3>
+        <p style="font-size: 0.9rem; color: #1e3a8a; margin-bottom: 16px;">Directly award bonus tokens (credits) to any user profile for positive behavior.</p>
+        <form hx-post="/api/admin/bonus" hx-target="#main-content" style="display: grid; grid-template-columns: 1fr 120px 1fr 90px auto; gap: 12px; align-items: end;" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
+            <div>
+                <label style="font-size: 0.8rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Receiving Member</label>
+                <select name="target_user_id" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #bfdbfe; font-size: 0.9rem;">
+                    <option value="" disabled selected>Select user</option>
+                    {% for u in users %}
+                    <option value="{{ u.id }}">{{ u.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label style="font-size: 0.8rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Bonus Amount</label>
+                <input type="number" name="amount" min="0.5" step="0.5" placeholder="e.g. 5.0" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #bfdbfe; font-size: 0.9rem;">
+            </div>
+            <div>
+                <label style="font-size: 0.8rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Description / Reason</label>
+                <input type="text" name="description" placeholder="e.g. Awesome helper attitude!" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #bfdbfe; font-size: 0.9rem;">
+            </div>
+            <div>
+                <label style="font-size: 0.8rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Admin PIN</label>
+                <input type="password" name="admin_pin" placeholder="PIN" pattern="\d{4}" maxlength="4" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #bfdbfe; text-align: center; font-size: 0.9rem;">
+            </div>
+            <button type="submit" style="padding: 8px 16px; background-color: #2563eb; color: white; border-radius: 6px; border: none; font-weight: 600; height: 38px; cursor: pointer;">Award</button>
+        </form>
+    </div>
+
+    <!-- 2. Reward Store Management Section (dynamically fetched via templates global) -->
+    {% set rewards_list = get_all_rewards() %}
+    <div style="margin-bottom: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin-top: 0;">🎁 Reward Store Management</h3>
+        </div>
+        
+        <div style="display: grid; gap: 8px;">
+            {% set reward_tiers = rewards_list | groupby('tier') %}
+            {% for tier, tier_rewards in reward_tiers %}
+            <details class="cat-rewards-tier-{{ tier }}">
+                <summary>
+                    {% if tier == 1 %}🎮 Tier 1: Screen & Network
+                    {% elif tier == 2 %}🎟️ Tier 2: Privileges & Passes
+                    {% else %}🍦 Tier 3: Quality Time & Outings{% endif %}
+                    <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-muted); margin-left: auto; margin-right: 12px;">{{ tier_rewards | length }} items</span>
+                </summary>
+                <div style="padding: 12px; display: grid; gap: 16px; background: #f9fafb;">
+                    {% for reward in tier_rewards %}
+                    <div class="card" id="reward-{{ reward.id }}" style="border: 1px solid #e5e7eb; padding: 20px; box-shadow: none; {% if not reward.is_active %}opacity: 0.6; background: #f9fafb;{% endif %}">
+                        <form hx-post="/api/admin/rewards/update" hx-target="#main-content" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
+                            <input type="hidden" name="reward_id" value="{{ reward.id }}">
+                            
+                            <div style="display: grid; grid-template-columns: 1fr auto; gap: 16px; margin-bottom: 12px;">
+                                <input type="text" name="title" value="{{ reward.title }}" style="font-weight: 700; font-size: 1.1rem; padding: 4px 8px;">
+                                
+                                <button 
+                                    type="button"
+                                    hx-post="/api/admin/rewards/toggle/{{ reward.id }}" 
+                                    hx-target="#main-content"
+                                    onclick="window.sessionStorage.setItem('adminScroll', window.scrollY)"
+                                    style="width: auto; padding: 8px 16px; font-size: 0.8rem; background-color: {% if reward.is_active %}#fee2e2; color: #ef4444;{% else %}#d1fae5; color: #10b981;{% endif %}"
+                                >
+                                    {% if reward.is_active %}Disable{% else %}Enable{% endif %}
+                                </button>
+                            </div>
+
+                            <div style="margin-bottom: 12px;">
+                                <label style="font-size: 0.8rem; color: var(--text-muted);">Description</label>
+                                <textarea name="description" rows="2" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px; font-family: inherit;">{{ reward.description }}</textarea>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 120px; gap: 12px; align-items: end;">
+                                <div>
+                                    <label style="font-size: 0.8rem; color: var(--text-muted);">Tier</label>
+                                    <select name="tier" style="padding: 4px;">
+                                        <option value="1" {% if reward.tier == 1 %}selected{% endif %}>Tier 1 (Screen/Network)</option>
+                                        <option value="2" {% if reward.tier == 2 %}selected{% endif %}>Tier 2 (Privileges)</option>
+                                        <option value="3" {% if reward.tier == 3 %}selected{% endif %}>Tier 3 (Quality Time)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.8rem; color: var(--text-muted);">Cost (Points)</label>
+                                    <input type="number" name="cost_points" value="{{ reward.cost_points }}" step="0.5" style="width: 100%; padding: 4px; text-align: center;">
+                                </div>
+                            </div>
+
+                            <button type="submit" style="margin-top: 16px; padding: 8px; font-size: 0.9rem; background-color: var(--primary);">Save Changes</button>
+                        </form>
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- 3. Family Ledger & Account Actions -->
+    <div style="margin-bottom: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px;">
+        <h3 style="margin-top: 0;">Family Ledger & Account Actions</h3>
         <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
             <thead>
                 <tr style="border-bottom: 2px solid #e5e7eb; text-align: left;">
@@ -97,40 +195,10 @@
         </table>
     </div>
 
-    <!-- Award Bonus Section -->
-    <div style="margin-bottom: 32px; background: #eff6ff; padding: 20px; border-radius: 12px; border: 1px solid #bfdbfe;">
-        <h3 style="margin-top: 0; color: #1e40af; display: flex; align-items: center; gap: 8px;">✨ Award Custom Bonus Credits</h3>
-        <p style="font-size: 0.9rem; color: #1e3a8a; margin-bottom: 16px;">Directly award bonus tokens (credits) to any user profile for positive behavior.</p>
-        <form hx-post="/api/admin/bonus" hx-target="#main-content" style="display: grid; grid-template-columns: 1fr 120px 1fr 90px auto; gap: 12px; align-items: end;" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
-            <div>
-                <label style="font-size: 0.8rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Receiving Member</label>
-                <select name="target_user_id" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #bfdbfe; font-size: 0.9rem;">
-                    <option value="" disabled selected>Select user</option>
-                    {% for u in users %}
-                    <option value="{{ u.id }}">{{ u.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label style="font-size: 0.8rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Bonus Amount</label>
-                <input type="number" name="amount" min="0.5" step="0.5" placeholder="e.g. 5.0" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #bfdbfe; font-size: 0.9rem;">
-            </div>
-            <div>
-                <label style="font-size: 0.8rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Description / Reason</label>
-                <input type="text" name="description" placeholder="e.g. Awesome helper attitude!" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #bfdbfe; font-size: 0.9rem;">
-            </div>
-            <div>
-                <label style="font-size: 0.8rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Admin PIN</label>
-                <input type="password" name="admin_pin" placeholder="PIN" pattern="\d{4}" maxlength="4" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #bfdbfe; text-align: center; font-size: 0.9rem;">
-            </div>
-            <button type="submit" style="padding: 8px 16px; background-color: #2563eb; color: white; border-radius: 6px; border: none; font-weight: 600; height: 38px; cursor: pointer;">Award</button>
-        </form>
-    </div>
-
-    <!-- Recent Transactions Audit Log -->
+    <!-- 4. Recent Transactions Audit Log -->
     {% if transactions %}
-    <div style="margin-bottom: 32px;">
-        <h3>Transaction Audit History</h3>
+    <div style="margin-bottom: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px;">
+        <h3 style="margin-top: 0;">Transaction Audit History</h3>
         <details>
             <summary style="font-size: 1rem; padding: 8px 12px;">View Recent Credits Transactions ({{ transactions | length }})</summary>
             <div style="padding: 12px; background-color: #f9fafb; border-radius: 8px; font-size: 0.85rem; max-height: 250px; overflow-y: auto;">
@@ -150,9 +218,10 @@
     </div>
     {% endif %}
 
-    <div>
+    <!-- 5. Chore Management -->
+    <div style="margin-bottom: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3>Chore Management</h3>
+            <h3 style="margin-top: 0;">Chore Management</h3>
         </div>
         
         <div style="display: grid; gap: 8px;">
@@ -199,7 +268,8 @@
                                     {% endfor %}
                                 </div>
                             </div>
-                                                      <div style="display: grid; grid-template-columns: 1fr 1fr 120px 80px 100px 120px; gap: 12px; align-items: end;">
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 120px 80px 100px 120px; gap: 12px; align-items: end;">
                                 <div>
                                     <label style="font-size: 0.8rem; color: var(--text-muted);">Category</label>
                                     <select name="category" style="padding: 4px;">
@@ -252,7 +322,7 @@
         </div>
     </div>
 
-    <!-- Google Calendar Connection Management -->
+    <!-- 6. Google Calendar Connection Management -->
     <div style="margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px; margin-bottom: 16px;">
         <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">📅 Google Calendar Connections</h3>
         <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 16px;">
@@ -361,7 +431,7 @@
         </form>
     </div>
 
-    <!-- Announcements Management -->
+    <!-- 7. Announcements Management -->
     <div style="margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px; margin-bottom: 16px;">
         <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">📢 Announcements</h3>
         <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 16px;">
@@ -372,7 +442,7 @@
         {% if announcements %}
         <div style="display: grid; gap: 8px; margin-bottom: 20px;">
             {% for ann in announcements %}
-            <div style="display: flex; justify-content: space-between; align-items: center; background: #f9fafb; padding: 12px 16px; border-radius: 8px; border: 1px solid #e5e7eb; border-left: 5px solid {% if ann.is_active %}var(--primary){% else %}#9ca3af{% endif %};">
+            <div style="display: flex; justify-content: space-between; align-items: center; background: #f9fafb; padding: 12px 16px; border-radius: 8px; border: 1px solid #e5e7eb; border-left: 5px solid {{ '#3b82f6' if ann.is_active else '#9ca3af' }};">
                 <div style="flex-grow: 1; margin-right: 16px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <strong style="color: var(--text);">{{ ann.title }}</strong>
@@ -425,7 +495,7 @@
         </form>
     </div>
 
-    <!-- Admin Audit Portal -->
+    <!-- 8. Admin Audit Portal -->
     <div style="margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px; margin-bottom: 16px;">
         <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">📋 Admin Audit & Remediation Portal</h3>
         <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 16px;">
@@ -438,4 +508,3 @@
         </div>
     </div>
 </div>
-
