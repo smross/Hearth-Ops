@@ -58,7 +58,7 @@ def init_db():
                 
                 # Seed default rewards if the rewards table is empty
                 cursor.execute("SELECT COUNT(*) as count FROM rewards")
-                if cursor.fetchone()['count'] == 0:
+                if cursor.fetchone()[0] == 0:
                     try:
                         from seed import DEFAULT_REWARDS
                         for r in DEFAULT_REWARDS:
