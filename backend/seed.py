@@ -73,8 +73,7 @@ DEFAULT_REWARDS = [
     # Tier 1: Screen Time & Network
     {"title": "30 Mins Xbox/PC", "desc": "30 minutes of gaming time on Xbox or PC.", "cost": 50.0, "tier": 1},
     {"title": "60 Mins Unrestricted Phone", "desc": "60 minutes of unrestricted phone usage.", "cost": 100.0, "tier": 1},
-    {"title": "'Lag-Free' Priority Pass", "desc": "Temporary high-priority network allocation.", "cost": 150.0, "tier": 1},
-    {"title": "Plume Network Profile Boost (1 Hour)", "desc": "Boost internet priority for 1 hour.", "cost": 150.0, "tier": 1},
+    {"title": "Plume Network 'Lag-Free' Priority Boost (1 Hour)", "desc": "Boost internet priority/allocation for 1 hour.", "cost": 150.0, "tier": 1},
     
     # Tier 2: Privileges & Passes
     {"title": "Pick Family Movie Night", "desc": "Choose the movie for the next family movie night.", "cost": 150.0, "tier": 2},

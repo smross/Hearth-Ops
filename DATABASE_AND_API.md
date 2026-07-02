@@ -98,8 +98,7 @@ The HearthOps economy uses a **100 points baseline** ratio system.
 ### 2. Tier 1 (Screen Time & Network)
 - **30 Mins Xbox/PC**: 50 pts
 - **60 Mins Unrestricted Phone**: 100 pts
-- **'Lag-Free' Priority Pass**: 150 pts
-- **Plume Network Profile Boost (1 Hour)**: 150 pts
+- **Plume Network 'Lag-Free' Priority Boost (1 Hour)**: 150 pts
 
 ### 3. Tier 2 (Privileges & Passes)
 - **Pick Family Movie Night**: 150 pts
