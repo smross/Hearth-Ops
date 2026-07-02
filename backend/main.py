@@ -438,6 +438,23 @@ async def index(request: Request):
             """
         )
         leaderboard = cursor.fetchall()
+
+        # Fetch 3 most recent redemptions
+        cursor.execute(
+            """
+            SELECT u.name as username, t.amount, t.description, t.created_at
+            FROM token_transactions t
+            JOIN users u ON t.user_id = u.id
+            WHERE t.category = 'spend'
+            ORDER BY t.created_at DESC
+            LIMIT 3
+            """
+        )
+        recent_redemptions = []
+        for row in cursor.fetchall():
+            r_dict = dict(row)
+            r_dict["created_at_local"] = format_to_central_time(row["created_at"])
+            recent_redemptions.append(r_dict)
         
     # Fetch calendar events for the landing page
     try:
@@ -451,7 +468,8 @@ async def index(request: Request):
         "ticker": ticker_items,
         "calendar_days": calendar_days,
         "active_announcements": active_announcements,
-        "leaderboard": leaderboard
+        "leaderboard": leaderboard,
+        "recent_redemptions": recent_redemptions
     })
 
 def get_admin_data(cursor):

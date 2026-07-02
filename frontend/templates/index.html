@@ -57,26 +57,52 @@
         {% include "login_snippet.html" %}
     </div>
 
-    <!-- Right Column: Family Leaderboard -->
-    <div class="grid-future card" style="padding: 16px;">
-        <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px; font-size: 1.1rem; border-bottom: 2px solid #f3f4f6; padding-bottom: 8px; margin-bottom: 12px;">🏆 Weekly Leaderboard</h3>
-        {% if leaderboard %}
-            <div style="display: grid; gap: 8px;">
-                {% for entry in leaderboard %}
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f3f4f6; padding: 8px 0; font-size: 0.95rem;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-weight: 800; color: var(--text-muted);">#{{ loop.index }}</span>
-                        <span style="font-weight: 700; color: var(--text);">{{ entry.name }}</span>
+    <!-- Right Column: Family Leaderboard & Recent Redemptions -->
+    <div class="grid-future card" style="padding: 16px; display: flex; flex-direction: column; gap: 24px;">
+        <div>
+            <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px; font-size: 1.1rem; border-bottom: 2px solid #f3f4f6; padding-bottom: 8px; margin-bottom: 12px;">🏆 Weekly Leaderboard</h3>
+            {% if leaderboard %}
+                <div style="display: grid; gap: 8px;">
+                    {% for entry in leaderboard %}
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f3f4f6; padding: 8px 0; font-size: 0.95rem;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-weight: 800; color: var(--text-muted);">#{{ loop.index }}</span>
+                            <span style="font-weight: 700; color: var(--text);">{{ entry.name }}</span>
+                        </div>
+                        <span style="font-weight: 800; color: var(--success);">🪙 {{ entry.total_earned }}</span>
                     </div>
-                    <span style="font-weight: 800; color: var(--success);">🪙 {{ entry.total_earned }}</span>
+                    {% endfor %}
                 </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <p style="font-style: italic; font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-top: 16px;">
-                No points earned in the last 7 days. Completed chores will rank here!
-            </p>
-        {% endif %}
+            {% else %}
+                <p style="font-style: italic; font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-top: 16px;">
+                    No points earned in the last 7 days. Completed chores will rank here!
+                </p>
+            {% endif %}
+        </div>
+
+        <div style="border-top: 2px solid #f3f4f6; padding-top: 16px;">
+            <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px; font-size: 1.1rem; border-bottom: 2px solid #f3f4f6; padding-bottom: 8px; margin-bottom: 12px;">🎁 Recent Redemptions</h3>
+            {% if recent_redemptions %}
+                <div style="display: grid; gap: 12px;">
+                    {% for tx in recent_redemptions %}
+                    <div style="font-size: 0.9rem; padding-bottom: 8px; border-bottom: 1px dashed #f3f4f6;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 700; color: var(--text);">{{ tx.username }}</span>
+                            <span style="font-weight: 800; color: var(--error);">🪙 {{ tx.amount | abs }}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+                            <span>{{ tx.description.replace('Redeemed: ', '') }}</span>
+                            <span style="font-size: 0.75rem;">{{ tx.created_at_local }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p style="font-style: italic; font-size: 0.85rem; color: var(--text-muted); text-align: center; padding-top: 8px; margin: 0;">
+                    No rewards redeemed recently.
+                </p>
+            {% endif %}
+        </div>
     </div>
 </div>
 {% endblock %}
