@@ -55,6 +55,21 @@ def init_db():
                     cursor.execute("ALTER TABLE chores ADD COLUMN after_four_pm INTEGER DEFAULT 0;")
                     conn.commit()
                     logger.info("Migrated chores: Added after_four_pm column successfully.")
+                
+                # Seed default rewards if the rewards table is empty
+                cursor.execute("SELECT COUNT(*) as count FROM rewards")
+                if cursor.fetchone()['count'] == 0:
+                    try:
+                        from seed import DEFAULT_REWARDS
+                        for r in DEFAULT_REWARDS:
+                            cursor.execute(
+                                "INSERT INTO rewards (title, description, cost_points, tier, is_active) VALUES (?, ?, ?, ?, 1)",
+                                (r["title"], r["desc"], r["cost"], r["tier"])
+                            )
+                        conn.commit()
+                        logger.info("Seeded default rewards into the empty rewards table.")
+                    except Exception as e:
+                        logger.error(f"Failed to auto-seed default rewards: {e}")
             logger.info("Database schema check/initialization and migrations completed successfully.")
         except Exception as e:
             logger.error(f"Failed to check/initialize database schema: {e}")
