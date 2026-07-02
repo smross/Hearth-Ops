@@ -588,7 +588,7 @@ async def admin_reset_ledger(request: Request, user_id: int = Form(...)):
 @app.post("/api/admin/ledger/adjust", response_class=HTMLResponse)
 async def admin_adjust_ledger(request: Request, user_id: int = Form(...), amount: float = Form(...), description: str = Form("")):
     """Adjusts (positive or negative) a user's token balance."""
-    category = "spend" if amount < 0 else "adjust"
+    category = "adjust"
     with get_db_connection() as conn:
         cursor = conn.cursor()
         try:
