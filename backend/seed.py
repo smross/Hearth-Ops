@@ -70,21 +70,34 @@ DEFAULT_CHORES = [
 
 # Rewards Store Menu
 DEFAULT_REWARDS = [
-    # Tier 1: Screen Time & Network
-    {"title": "30 Mins Xbox/PC", "desc": "30 minutes of gaming time on Xbox or PC.", "cost": 50.0, "tier": 1},
-    {"title": "60 Mins Unrestricted Phone", "desc": "60 minutes of unrestricted phone usage.", "cost": 100.0, "tier": 1},
-    {"title": "Plume Network 'Lag-Free' Priority Boost (1 Hour)", "desc": "Boost internet priority/allocation for 1 hour.", "cost": 150.0, "tier": 1},
+    # Tier 1: Spend (Screen Time & Network)
+    {"title": "30 Mins Xbox/PC", "desc": "30 minutes of gaming time on Xbox or PC.", "cost": 50.0, "tier": 1, "target_jar": "spend"},
+    {"title": "60 Mins Unrestricted Phone", "desc": "60 minutes of unrestricted phone usage.", "cost": 100.0, "tier": 1, "target_jar": "spend"},
+    {"title": "Plume Network 'Lag-Free' Priority Boost (1 Hour)", "desc": "Boost internet priority/allocation for 1 hour.", "cost": 150.0, "tier": 1, "target_jar": "spend"},
     
-    # Tier 2: Privileges & Passes
-    {"title": "Pick Family Movie Night", "desc": "Choose the movie for the next family movie night.", "cost": 150.0, "tier": 2},
-    {"title": "Pick Family Dessert", "desc": "Choose the dessert for a family meal.", "cost": 100.0, "tier": 2},
-    {"title": "Pick Family Dinner Menu", "desc": "Select the menu for a family dinner.", "cost": 300.0, "tier": 2},
-    {"title": "'Get Out of Jail Free' Chore Pass", "desc": "Allows skipping a task and routing it to a sibling or bounty pool.", "cost": 500.0, "tier": 2},
+    # Tier 1: Save (Cash Payouts)
+    {"title": "$1.00 Cash Out", "desc": "Exchange 100 Save points for $1.00 physical cash.", "cost": 100.0, "tier": 1, "target_jar": "save"},
     
-    # Tier 3: Quality Time & Outings
-    {"title": "'QT Cone' Ice Cream Run with Mom/Dad", "desc": "One-on-one ice cream run with Mom or Dad.", "cost": 400.0, "tier": 3},
-    {"title": "Late-Night Passenger", "desc": "Stay up 1 hour late on weekend.", "cost": 250.0, "tier": 3},
-    {"title": "Chesterfield Valley Excursion", "desc": "2-hour weekend outing of your choice.", "cost": 800.0, "tier": 3},
+    # Tier 2: Spend (Privileges & Passes)
+    {"title": "Pick Family Movie Night", "desc": "Choose the movie for the next family movie night.", "cost": 150.0, "tier": 2, "target_jar": "spend"},
+    {"title": "Pick Family Dessert", "desc": "Choose the dessert for a family meal.", "cost": 100.0, "tier": 2, "target_jar": "spend"},
+    {"title": "Pick Family Dinner Menu", "desc": "Select the menu for a family dinner.", "cost": 300.0, "tier": 2, "target_jar": "spend"},
+    {"title": "'Get Out of Jail Free' Chore Pass", "desc": "Allows skipping a task and routing it to a sibling or bounty pool.", "cost": 500.0, "tier": 2, "target_jar": "spend"},
+    
+    # Tier 2: Save (Cash Payouts)
+    {"title": "$5.00 Cash Out", "desc": "Exchange 500 Save points for $5.00 physical cash.", "cost": 500.0, "tier": 2, "target_jar": "save"},
+    
+    # Tier 2: Give (Charity Match)
+    {"title": "Donate $5.00 to Charity", "desc": "Donate $5.00 to a charity of your choice (matched by parents).", "cost": 500.0, "tier": 2, "target_jar": "give"},
+
+    # Tier 3: Save (Outings & High-Value Cash)
+    {"title": "$10.00 Cash Out", "desc": "Exchange 1000 Save points for $10.00 physical cash.", "cost": 1000.0, "tier": 3, "target_jar": "save"},
+    {"title": "'QT Cone' Ice Cream Run with Mom/Dad", "desc": "One-on-one ice cream run with Mom or Dad.", "cost": 400.0, "tier": 3, "target_jar": "save"},
+    {"title": "Late-Night Passenger", "desc": "Stay up 1 hour late on weekend.", "cost": 250.0, "tier": 3, "target_jar": "save"},
+    {"title": "Chesterfield Valley Excursion", "desc": "2-hour weekend outing of your choice.", "cost": 800.0, "tier": 3, "target_jar": "save"},
+
+    # Tier 3: Give (Charity Match)
+    {"title": "Donate $10.00 to Charity", "desc": "Donate $10.00 to a charity of your choice (matched by parents).", "cost": 1000.0, "tier": 3, "target_jar": "give"},
 ]
 
 def seed_database():
@@ -154,10 +167,10 @@ def seed_database():
             for reward in DEFAULT_REWARDS:
                 cursor.execute(
                     """
-                    INSERT INTO rewards (title, description, cost_points, tier)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO rewards (title, description, cost_points, tier, target_jar)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    (reward["title"], reward["desc"], reward["cost"], reward["tier"])
+                    (reward["title"], reward["desc"], reward["cost"], reward["tier"], reward.get("target_jar", "spend"))
                 )
                 logger.info(f"Seeded reward: {reward['title']}")
 

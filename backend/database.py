@@ -56,6 +56,44 @@ def init_db():
                     conn.commit()
                     logger.info("Migrated chores: Added after_four_pm column successfully.")
                 
+                # Check and dynamically add save_balance and give_balance to users table
+                cursor.execute("PRAGMA table_info(users)")
+                user_columns = [row[1] for row in cursor.fetchall()]
+                if 'save_balance' not in user_columns:
+                    cursor.execute("ALTER TABLE users ADD COLUMN save_balance REAL DEFAULT 0.0;")
+                    conn.commit()
+                    logger.info("Migrated users: Added save_balance column successfully.")
+                if 'give_balance' not in user_columns:
+                    cursor.execute("ALTER TABLE users ADD COLUMN give_balance REAL DEFAULT 0.0;")
+                    conn.commit()
+                    logger.info("Migrated users: Added give_balance column successfully.")
+
+                # Check and dynamically add target_jar to rewards table
+                cursor.execute("PRAGMA table_info(rewards)")
+                rewards_columns = [row[1] for row in cursor.fetchall()]
+                if 'target_jar' not in rewards_columns:
+                    cursor.execute("ALTER TABLE rewards ADD COLUMN target_jar TEXT DEFAULT 'spend';")
+                    conn.commit()
+                    logger.info("Migrated rewards: Added target_jar column successfully.")
+
+                # Create payout_requests table if it doesn't exist
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS payout_requests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    reward_id INTEGER,
+                    amount_tokens REAL NOT NULL,
+                    cash_value REAL,
+                    payout_type TEXT NOT NULL,
+                    status TEXT DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    resolved_at TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (reward_id) REFERENCES rewards(id) ON DELETE SET NULL
+                );
+                """)
+                conn.commit()
+                
                 # Seed default rewards if the rewards table is empty
                 cursor.execute("SELECT COUNT(*) as count FROM rewards")
                 if cursor.fetchone()[0] == 0:
@@ -63,8 +101,8 @@ def init_db():
                         from seed import DEFAULT_REWARDS
                         for r in DEFAULT_REWARDS:
                             cursor.execute(
-                                "INSERT INTO rewards (title, description, cost_points, tier, is_active) VALUES (?, ?, ?, ?, 1)",
-                                (r["title"], r["desc"], r["cost"], r["tier"])
+                                "INSERT INTO rewards (title, description, cost_points, tier, target_jar, is_active) VALUES (?, ?, ?, ?, ?, 1)",
+                                (r["title"], r["desc"], r["cost"], r["tier"], r.get("target_jar", "spend"))
                             )
                         conn.commit()
                         logger.info("Seeded default rewards into the empty rewards table.")

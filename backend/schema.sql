@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS users (
     name TEXT NOT NULL UNIQUE,
     pin_hash TEXT NOT NULL,
     token_balance REAL DEFAULT 0.0,
+    save_balance REAL DEFAULT 0.0,
+    give_balance REAL DEFAULT 0.0,
     is_parent INTEGER DEFAULT 0, -- 1=Parent, 0=Child
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -113,6 +115,21 @@ CREATE TABLE IF NOT EXISTS admin_audit_logs (
     FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- 12. Payout / Fulfillment Requests (Parent Queue)
+CREATE TABLE IF NOT EXISTS payout_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    reward_id INTEGER,
+    amount_tokens REAL NOT NULL,
+    cash_value REAL,
+    payout_type TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (reward_id) REFERENCES rewards(id) ON DELETE SET NULL
+);
+
 -- 11. Rewards Store Menu Table
 CREATE TABLE IF NOT EXISTS rewards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -120,6 +137,7 @@ CREATE TABLE IF NOT EXISTS rewards (
     description TEXT,
     cost_points REAL NOT NULL,
     tier INTEGER NOT NULL, -- 1, 2, or 3
+    target_jar TEXT DEFAULT 'spend',
     is_active INTEGER DEFAULT 1
 );
 
