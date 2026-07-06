@@ -40,3 +40,11 @@ This file tracks the active deployment state of the HearthOps monorepo. Use this
 - [x] **Task 7.3:** Implement landing page alert banner showing active notice cards dynamically.
 - [x] **Task 7.4:** Establish logged-in user interceptor modal requiring explicit "Got It" clicks to persist acknowledgments.
 - [x] **Task 7.5:** Standardize screensaver viewport constraints and unified America/Chicago CT/CDT AM/PM time formatting.
+
+## 🟩 Phase 8: Three-Jar Point Allocation (Spend/Save/Give) & Parent Approval Queue
+- [x] **Task 8.1:** Add `save_balance`, `give_balance`, and `target_jar` fields to database schemas and update default seed configurations.
+- [x] **Task 8.2:** Implement integer-based auto-split mathematical allocation (50% Spend / 30% Save / 20% Give) on chore completion and undo.
+- [x] **Task 8.3:** Build a parent-approval queue for high-value Save (cash payout) and Give (charity match) store redemptions.
+- [x] **Task 8.4:** Redesign the Admin Console ledger table to split balances, unified positive/negative manual adjustments, and pending payout controls.
+- [x] **Task 8.5:** Integrate HTMX `hx-confirm` modal safety checks for parent balance resets.
+- [x] **Task 8.6:** Migrate all transaction history and active balances on staging to a clean 10x integer scale.

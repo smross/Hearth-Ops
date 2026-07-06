@@ -3,9 +3,9 @@
 This file provides foundational context for Gemini CLI when working on the HearthOps project.
 
 ## 📍 Project State
-- **Current Phase:** Phase 5 (Docker Integration & Local Validation) completed.
+- **Current Phase:** Phase 8 (Three-Jar Point Allocation & Parent Approval Queue) completed.
 - **Production Status:** Running as persistent Docker service on PC (192.168.40.21:8000).
-- **Completed:** Multi-user assignments, frequency enforcement, and full Admin Console.
+- **Completed:** Multi-user assignments, frequency enforcement, full Admin Console, 50/30/20 auto-splits, 10x integer scale, and parent confirmation payout queue.
 - **Active Branch:** `feature/alpha-scaffold`
 - **Roadmap:** Refer to `TASKS.md` for the granular checklist.
 - **Guideposts:** Refer to `GUIDEPOST.md` for architectural rationale and deep-dives.
