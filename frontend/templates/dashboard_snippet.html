@@ -21,9 +21,19 @@
                 <button onclick="showChangeNameModal()" style="width: auto; padding: 4px 8px; font-size: 0.75rem; background: none; color: var(--text-muted); border: 1px solid #e5e7eb; margin-top: 4px; border-radius: 4px;">Change Name</button>
             </div>
         </div>
-        <div style="text-align: right;">
-            <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Balance</span>
-            <div style="font-size: 1.5rem; font-weight: 800; color: var(--success);">🪙 {{ user.token_balance }}</div>
+        <div style="display: flex; gap: 16px; align-items: center;">
+            <div style="text-align: right;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">🎮 Spend</span>
+                <div style="font-size: 1.25rem; font-weight: 800; color: var(--primary);">🪙 {{ user.token_balance | round | int }}</div>
+            </div>
+            <div style="text-align: right; border-left: 1px solid #e5e7eb; padding-left: 16px;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">🛡️ Save</span>
+                <div style="font-size: 1.25rem; font-weight: 800; color: #10b981;">🪙 {{ user.save_balance | round | int }}</div>
+            </div>
+            <div style="text-align: right; border-left: 1px solid #e5e7eb; padding-left: 16px;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">❤️ Give</span>
+                <div style="font-size: 1.25rem; font-weight: 800; color: #8b5cf6;">🪙 {{ user.give_balance | round | int }}</div>
+            </div>
         </div>
     </div>
 
@@ -83,7 +93,7 @@
                     <span style="font-size: 0.75rem; background-color: #d1fae5; color: #065f46; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">You</span>
                     {% endif %}
                 </div>
-                <span class="leaderboard-score" style="font-weight: 700; color: var(--success);">🪙 {{ entry.total_earned }}</span>
+                <span class="leaderboard-score" style="font-weight: 700; color: var(--success);">🪙 {{ entry.total_earned | round | int }}</span>
             </div>
             {% endfor %}
         </div>
@@ -96,7 +106,7 @@
         <div style="display: grid; gap: 8px;">
             {% for rc in recent_completes %}
             <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 8px 12px; border-radius: 8px; border: 1px solid #fca5a5;">
-                <span style="font-size: 0.85rem; font-weight: 600;">{{ rc.title }} (+{{ rc.value_credits }})</span>
+                <span style="font-size: 0.85rem; font-weight: 600;">{{ rc.title }} (+{{ rc.value_credits | round | int }})</span>
                 <button 
                     class="chore-action-btn" 
                     style="width: auto; padding: 4px 8px; font-size: 0.75rem; background-color: var(--error); border-radius: 6px;"
@@ -235,18 +245,30 @@
             </summary>
             <div class="chore-list">
                 {% for reward in tier_rewards %}
-                <div class="chore-item" style="{% if user.token_balance < reward.cost_points %}opacity: 0.6;{% endif %}">
+                {% set reward_jar = reward.target_jar or 'spend' %}
+                {% set balance = user.token_balance if reward_jar == 'spend' else (user.save_balance if reward_jar == 'save' else user.give_balance) %}
+                <div class="chore-item" style="{% if balance < reward.cost_points %}opacity: 0.6;{% endif %}">
                     <div class="chore-info">
-                        <h4 class="chore-title">{{ reward.title }}</h4>
-                        <p class="chore-desc">{{ reward.description }}</p>
+                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                            <span style="font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase;
+                                {% if reward_jar == 'spend' %}background: #eff6ff; color: #1d4ed8;
+                                {% elif reward_jar == 'save' %}background: #ecfdf5; color: #047857;
+                                {% else %}background: #f5f3ff; color: #6d28d9;{% endif %}">
+                                {% if reward_jar == 'spend' %}🎮 Spend{% elif reward_jar == 'save' %}🛡️ Save{% else %}❤️ Give{% endif %}
+                            </span>
+                            <h4 class="chore-title" style="margin: 0;">{{ reward.title }}</h4>
+                        </div>
+                        <p class="chore-desc" style="margin: 4px 0 0 0;">{{ reward.description }}</p>
                     </div>
                     <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
-                        <div class="chore-value" style="color: var(--error);">🪙 {{ reward.cost_points }}</div>
+                        <div class="chore-value" style="color: {% if reward_jar == 'spend' %}var(--primary){% elif reward_jar == 'save' %}#10b981{% else %}#8b5cf6{% endif %}; font-weight: 700;">
+                            {% if reward_jar == 'spend' %}🪙{% elif reward_jar == 'save' %}🛡️{% else %}❤️{% endif %} {{ reward.cost_points | round | int }}
+                        </div>
                         <button 
                             class="chore-action-btn"
-                            style="background-color: {% if user.token_balance >= reward.cost_points %}var(--primary){% else %}#d1d5db{% endif %};"
-                            {% if user.token_balance >= reward.cost_points %}
-                            onclick="requestRewardPin('{{ reward.id }}', '{{ reward.title }}', '{{ reward.cost_points }}')"
+                            style="background-color: {% if balance >= reward.cost_points %}{% if reward_jar == 'spend' %}var(--primary){% elif reward_jar == 'save' %}#10b981{% else %}#8b5cf6{% endif %}{% else %}#d1d5db{% endif %};"
+                            {% if balance >= reward.cost_points %}
+                            onclick="requestRewardPin('{{ reward.id }}', '{{ reward.title }}', '{{ reward.cost_points | round | int }}')"
                             {% else %}
                             disabled
                             {% endif %}
@@ -276,7 +298,7 @@
                             <span style="display: block; font-size: 0.75rem; color: var(--text-muted);">{{ tx.created_at }}</span>
                         </div>
                         <span style="font-weight: 700; color: {% if tx.amount < 0 %}var(--error){% else %}var(--success){% endif %};">
-                            {% if tx.amount < 0 %}🪙 {{ tx.amount }}{% else %}+🪙 {{ tx.amount }}{% endif %}
+                            {% if tx.amount < 0 %}🪙 {{ tx.amount | round | int }}{% else %}+🪙 {{ tx.amount | round | int }}{% endif %}
                         </span>
                     </div>
                     {% endfor %}

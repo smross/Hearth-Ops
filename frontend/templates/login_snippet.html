@@ -32,7 +32,7 @@
                                    {% else %}
                                    color: #4b5563;
                                    {% endif %}">
-                            🪙 {{ user.token_balance }} (+{{ user.earned_today }})
+                            🪙 {{ user.token_balance | round | int }} (+{{ user.earned_today | round | int }})
                         </div>
                     </button>
                     <button type="button" 
@@ -82,7 +82,7 @@
                                    {% else %}
                                    color: #4b5563;
                                    {% endif %}">
-                            🪙 {{ user.token_balance }} (+{{ user.earned_today }})
+                            🪙 {{ user.token_balance | round | int }} (+{{ user.earned_today | round | int }})
                         </div>
                     </button>
                     <button type="button" 

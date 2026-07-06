@@ -32,7 +32,7 @@
     <div style="margin-bottom: 32px; background: #eff6ff; padding: 20px; border-radius: 12px; border: 1px solid #bfdbfe;">
         <h3 style="margin-top: 0; color: #1e40af; display: flex; align-items: center; gap: 8px;">✨ Award Custom Bonus Credits</h3>
         <p style="font-size: 0.9rem; color: #1e3a8a; margin-bottom: 16px;">Directly award bonus tokens (credits) to any user profile for positive behavior.</p>
-        <form hx-post="/api/admin/bonus" hx-target="#main-content" style="display: grid; grid-template-columns: 1fr 120px 1fr 90px auto; gap: 12px; align-items: end;" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
+        <form hx-post="/api/admin/bonus" hx-target="#main-content" style="display: grid; grid-template-columns: 1fr 100px 120px 1fr 90px auto; gap: 12px; align-items: end;" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
             <div>
                 <label style="font-size: 0.8rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Receiving Member</label>
                 <select name="target_user_id" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #bfdbfe; font-size: 0.9rem;">
@@ -43,8 +43,17 @@
                 </select>
             </div>
             <div>
-                <label style="font-size: 0.8rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Bonus Amount</label>
-                <input type="number" name="amount" min="0.5" step="0.5" placeholder="e.g. 5.0" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #bfdbfe; font-size: 0.9rem;">
+                <label style="font-size: 0.8rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Target Jar</label>
+                <select name="target_jar" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #bfdbfe; font-size: 0.9rem;">
+                    <option value="split" selected>Auto-Split (50/30/20)</option>
+                    <option value="spend">Spend Jar (Instant)</option>
+                    <option value="save">Save Jar (Cash/Outing)</option>
+                    <option value="give">Give Jar (Charity)</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size: 0.8rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Amount (+ / -)</label>
+                <input type="number" name="amount" step="1" placeholder="e.g. 5 or -2" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #bfdbfe; font-size: 0.9rem;">
             </div>
             <div>
                 <label style="font-size: 0.8rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Description / Reason</label>
@@ -164,18 +173,26 @@
                                 <textarea name="description" rows="2" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px; font-family: inherit;">{{ reward.description }}</textarea>
                             </div>
 
-                            <div style="display: grid; grid-template-columns: 1fr 120px; gap: 12px; align-items: end;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 120px; gap: 12px; align-items: end;">
                                 <div>
                                     <label style="font-size: 0.8rem; color: var(--text-muted);">Tier</label>
-                                    <select name="tier" style="padding: 4px;">
+                                    <select name="tier" style="padding: 4px; width: 100%;">
                                         <option value="1" {% if reward.tier == 1 %}selected{% endif %}>Tier 1 (Screen/Network)</option>
                                         <option value="2" {% if reward.tier == 2 %}selected{% endif %}>Tier 2 (Privileges)</option>
                                         <option value="3" {% if reward.tier == 3 %}selected{% endif %}>Tier 3 (Quality Time)</option>
                                     </select>
                                 </div>
                                 <div>
+                                    <label style="font-size: 0.8rem; color: var(--text-muted);">Target Jar</label>
+                                    <select name="target_jar" style="padding: 4px; width: 100%;">
+                                        <option value="spend" {% if reward.target_jar == 'spend' or not reward.target_jar %}selected{% endif %}>🎮 Spend Jar</option>
+                                        <option value="save" {% if reward.target_jar == 'save' %}selected{% endif %}>🛡️ Save Jar</option>
+                                        <option value="give" {% if reward.target_jar == 'give' %}selected{% endif %}>❤️ Give Jar</option>
+                                    </select>
+                                </div>
+                                <div>
                                     <label style="font-size: 0.8rem; color: var(--text-muted);">Cost (Points)</label>
-                                    <input type="number" name="cost_points" value="{{ reward.cost_points }}" step="0.5" style="width: 100%; padding: 4px; text-align: center;">
+                                    <input type="number" name="cost_points" value="{{ reward.cost_points | round | int }}" step="1" style="width: 100%; padding: 4px; text-align: center;">
                                 </div>
                             </div>
 
@@ -189,16 +206,84 @@
         </div>
     </div>
 
+    <!-- 3.5. Pending Payout & Charity Matches Queue -->
+    {% set pending_payouts = get_pending_payout_requests() %}
+    <div style="margin-bottom: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px;">
+        <h3 style="margin-top: 0; color: #047857; display: flex; align-items: center; gap: 8px;">⏳ Pending Payouts & Charity Matches</h3>
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 16px;">
+            Kids' redemptions from their <strong>Save Jar</strong> (Cash Out / Outings) or <strong>Give Jar</strong> (Charity Matches) require parent fulfillment and authorization.
+        </p>
+
+        {% if pending_payouts %}
+        <div style="display: grid; gap: 12px; margin-top: 12px;">
+            {% for req in pending_payouts %}
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <strong style="color: #166534; font-size: 1rem;">{{ req.user_name }}</strong>
+                        <span style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; font-weight: 700; text-transform: uppercase;
+                            {% if req.payout_type == 'cash' %}background: #ecfdf5; color: #047857;
+                            {% elif req.payout_type == 'charity' %}background: #f5f3ff; color: #6d28d9;
+                            {% else %}background: #eff6ff; color: #1d4ed8;{% endif %}">
+                            {% if req.payout_type == 'cash' %}💵 Cash Out{% elif req.payout_type == 'charity' %}❤️ Charity Match{% else %}🎟️ Outing/Other{% endif %}
+                        </span>
+                    </div>
+                    <div style="margin-top: 4px; font-size: 0.95rem; color: #374151;">
+                        Redeemed: <strong>{{ req.reward_title }}</strong>
+                    </div>
+                    <div style="margin-top: 4px; font-size: 0.8rem; color: var(--text-muted);">
+                        Requested: {{ req.created_at }} | Amount: <strong>{{ req.amount_tokens }} tokens</strong>
+                        {% if req.cash_value is not none and req.cash_value > 0 %}
+                         | Cash Value: <strong style="color: #047857;">${{ "%.2f"|format(req.cash_value) }}</strong>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div>
+                    <!-- Form for authorization -->
+                    <form style="display: flex; gap: 8px; align-items: center; margin: 0;" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
+                        <input type="hidden" name="request_id" value="{{ req.id }}">
+                        <input type="password" name="admin_pin" placeholder="Admin PIN" pattern="\d{4}" maxlength="4" required 
+                               style="width: 90px; padding: 6px; font-size: 0.85rem; height: 36px; text-align: center; border: 1px solid #bbf7d0; border-radius: 6px; box-sizing: border-box;">
+                        
+                        <button type="button" 
+                                hx-post="/api/admin/payouts/approve" 
+                                hx-target="#main-content" 
+                                hx-include="closest form"
+                                style="width: auto; padding: 0 12px; font-size: 0.85rem; height: 36px; background-color: var(--success); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                            Approve
+                        </button>
+                        
+                        <button type="button" 
+                                hx-post="/api/admin/payouts/decline" 
+                                hx-target="#main-content" 
+                                hx-include="closest form"
+                                style="width: auto; padding: 0 12px; font-size: 0.85rem; height: 36px; background-color: var(--error); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                            Decline
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div style="background: #f9fafb; border: 1px dashed #e5e7eb; padding: 24px; text-align: center; border-radius: 12px; color: var(--text-muted); font-size: 0.95rem;">
+            🌳 All caught up! No pending payouts or charity matching requests.
+        </div>
+        {% endif %}
+    </div>
+
     <!-- 4. Family Ledger & Account Actions -->
     <div style="margin-bottom: 32px; border-top: 1px solid #e5e7eb; padding-top: 24px;">
         <h3 style="margin-top: 0;">Family Ledger & Account Actions</h3>
         <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
             <thead>
                 <tr style="border-bottom: 2px solid #e5e7eb; text-align: left;">
-                    <th style="padding: 12px 8px; width: 15%;">Member</th>
-                    <th style="padding: 12px 8px; text-align: right; width: 15%;">Balance</th>
-                    <th style="padding: 12px 8px; text-align: right; width: 35%;">Adjust Credits</th>
-                    <th style="padding: 12px 8px; text-align: right; width: 35%;">Account Actions</th>
+                    <th style="padding: 12px 8px; width: 25%;">Member</th>
+                    <th style="padding: 12px 8px; text-align: right; width: 15%;">🎮 Spend</th>
+                    <th style="padding: 12px 8px; text-align: right; width: 15%;">🛡️ Save</th>
+                    <th style="padding: 12px 8px; text-align: right; width: 15%;">❤️ Give</th>
+                    <th style="padding: 12px 8px; text-align: right; width: 30%;">Account Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -222,16 +307,9 @@
                             title="Click to rename profile"
                         >
                     </td>
-                    <td style="padding: 12px 8px; text-align: right; color: var(--success); font-weight: 700; white-space: nowrap;">🪙 {{ user.token_balance }}</td>
-                    <td style="padding: 12px 8px; text-align: right;">
-                        <!-- Inline adjust credits form -->
-                        <form hx-post="/api/admin/ledger/adjust" hx-target="#main-content" style="display: inline-flex; gap: 4px; justify-content: flex-end; width: 100%;" onsubmit="window.sessionStorage.setItem('adminScroll', window.scrollY)">
-                            <input type="hidden" name="user_id" value="{{ user.id }}">
-                            <input type="number" name="amount" placeholder="+/- value" step="0.5" required style="width: 80px; padding: 4px 8px; font-size: 0.85rem; height: 36px;">
-                            <input type="text" name="description" placeholder="Reason" style="width: 120px; padding: 4px 8px; font-size: 0.85rem; height: 36px;">
-                            <button type="submit" style="width: auto; padding: 4px 12px; font-size: 0.85rem; height: 36px; background-color: var(--primary);">Go</button>
-                        </form>
-                    </td>
+                    <td style="padding: 12px 8px; text-align: right; font-weight: 700; color: var(--primary); font-size: 1.05rem; white-space: nowrap;">🪙 {{ user.token_balance | round | int }}</td>
+                    <td style="padding: 12px 8px; text-align: right; font-weight: 700; color: #10b981; font-size: 1.05rem; white-space: nowrap;">🪙 {{ user.save_balance | round | int }}</td>
+                    <td style="padding: 12px 8px; text-align: right; font-weight: 700; color: #8b5cf6; font-size: 1.05rem; white-space: nowrap;">🪙 {{ user.give_balance | round | int }}</td>
                     <td style="padding: 12px 8px; text-align: right;">
                         <div style="display: inline-flex; gap: 8px; justify-content: flex-end;">
                             <!-- Reset balance button -->
@@ -240,7 +318,8 @@
                                 hx-target="#main-content" 
                                 hx-include="[name='user_id']" 
                                 hx-vals='{"user_id": "{{ user.id }}"}'
-                                onclick="if(!confirm('Reset token balance to 0 for {{ user.name }}?')) return false; window.sessionStorage.setItem('adminScroll', window.scrollY)"
+                                hx-confirm="Reset all balances (Spend, Save, Give) to 0 for {{ user.name }}?"
+                                onclick="window.sessionStorage.setItem('adminScroll', window.scrollY)"
                                 style="width: auto; padding: 4px 12px; font-size: 0.8rem; background-color: var(--error); height: 36px;"
                             >
                                 Reset Balance

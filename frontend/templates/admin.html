@@ -7,15 +7,19 @@
         <table style="width: 100%; border-collapse: collapse;">
             <thead>
                 <tr style="border-bottom: 2px solid #e5e7eb; text-align: left;">
-                    <th style="padding: 12px 0;">Member</th>
-                    <th style="padding: 12px 0; text-align: right;">Current Balance</th>
+                    <th style="padding: 12px 8px;">Member</th>
+                    <th style="padding: 12px 8px; text-align: right;">🎮 Spend</th>
+                    <th style="padding: 12px 8px; text-align: right;">🛡️ Save</th>
+                    <th style="padding: 12px 8px; text-align: right;">❤️ Give</th>
                 </tr>
             </thead>
             <tbody>
                 {% for user in users %}
                 <tr style="border-bottom: 1px solid #f3f4f6;">
-                    <td style="padding: 16px 0; font-weight: 600;">{{ user.name }}</td>
-                    <td style="padding: 16px 0; text-align: right; color: var(--success); font-weight: 700;">🪙 {{ user.token_balance }}</td>
+                    <td style="padding: 16px 8px; font-weight: 600;">{{ user.name }}</td>
+                    <td style="padding: 16px 8px; text-align: right; color: var(--primary); font-weight: 700;">🪙 {{ user.token_balance | round | int }}</td>
+                    <td style="padding: 16px 8px; text-align: right; color: #10b981; font-weight: 700;">🪙 {{ user.save_balance | round | int }}</td>
+                    <td style="padding: 16px 8px; text-align: right; color: #8b5cf6; font-weight: 700;">🪙 {{ user.give_balance | round | int }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

@@ -69,7 +69,7 @@
                             <span style="font-weight: 800; color: var(--text-muted);">#{{ loop.index }}</span>
                             <span style="font-weight: 700; color: var(--text);">{{ entry.name }}</span>
                         </div>
-                        <span style="font-weight: 800; color: var(--success);">🪙 {{ entry.total_earned }}</span>
+                        <span style="font-weight: 800; color: var(--success);">🪙 {{ entry.total_earned | round | int }}</span>
                     </div>
                     {% endfor %}
                 </div>
@@ -88,7 +88,7 @@
                     <div style="font-size: 0.9rem; padding-bottom: 8px; border-bottom: 1px dashed #f3f4f6;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="font-weight: 700; color: var(--text);">{{ tx.username }}</span>
-                            <span style="font-weight: 800; color: var(--error);">🪙 {{ tx.amount | abs }}</span>
+                            <span style="font-weight: 800; color: var(--error);">🪙 {{ tx.amount | abs | round | int }}</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
                             <span>{{ tx.description.replace('Redeemed: ', '') }}</span>
