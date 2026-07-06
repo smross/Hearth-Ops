@@ -332,10 +332,27 @@ templates.env.globals["app_env"] = os.getenv("APP_ENV", "production")
 def get_all_rewards():
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, title, description, cost_points, tier, is_active FROM rewards ORDER BY tier, cost_points")
+        cursor.execute("SELECT id, title, description, cost_points, tier, target_jar, is_active FROM rewards ORDER BY tier, cost_points")
         return [dict(r) for r in cursor.fetchall()]
 
 templates.env.globals["get_all_rewards"] = get_all_rewards
+
+def get_pending_payout_requests():
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT p.id, u.name as user_name, p.amount_tokens, p.cash_value, p.payout_type, p.status, p.created_at, r.title as reward_title
+            FROM payout_requests p
+            JOIN users u ON p.user_id = u.id
+            LEFT JOIN rewards r ON p.reward_id = r.id
+            WHERE p.status = 'pending'
+            ORDER BY p.created_at DESC
+            """
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+templates.env.globals["get_pending_payout_requests"] = get_pending_payout_requests
 app.mount("/static", StaticFiles(directory=os.path.join(FRONTEND_DIR, "static")), name="static")
 
 # --- Models ---
@@ -386,7 +403,7 @@ async def index(request: Request):
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT u.id, u.name, u.is_parent, u.token_balance,
+            SELECT u.id, u.name, u.is_parent, u.token_balance, u.save_balance, u.give_balance,
                    COALESCE((SELECT SUM(c.value_credits) FROM chore_logs l JOIN chores c ON l.chore_id = c.id WHERE l.user_id = u.id AND l.action_type = 'earn' AND date(l.completed_at, 'localtime') = date('now', 'localtime')), 0.0) as earned_today
             FROM users u
             ORDER BY u.name
@@ -474,7 +491,7 @@ async def index(request: Request):
 
 def get_admin_data(cursor):
     """Helper to fetch all details for admin snippet updates."""
-    cursor.execute("SELECT id, name, token_balance FROM users ORDER BY name")
+    cursor.execute("SELECT id, name, token_balance, save_balance, give_balance FROM users ORDER BY name")
     users = cursor.fetchall()
     
     cursor.execute("SELECT id, title, description, category, frequency, value_credits, max_daily_completions, is_active, is_required, after_four_pm FROM chores ORDER BY category, title")
@@ -556,18 +573,26 @@ async def admin_reset_ledger(request: Request, user_id: int = Form(...)):
         cursor = conn.cursor()
         try:
             cursor.execute("BEGIN TRANSACTION;")
-            cursor.execute("SELECT name, token_balance FROM users WHERE id = ?", (user_id,))
+            cursor.execute("SELECT name, token_balance, save_balance, give_balance FROM users WHERE id = ?", (user_id,))
             user = cursor.fetchone()
             
             if user:
+                total_to_reset = user["token_balance"] + user["save_balance"] + user["give_balance"]
                 # Log adjustment transaction
                 cursor.execute(
                     "INSERT INTO token_transactions (user_id, amount, category, description) VALUES (?, ?, 'adjust', ?)",
-                    (user_id, -user["token_balance"], f"Manual reset of token balance by admin.")
+                    (user_id, -total_to_reset, f"Manual reset of all balances by admin.")
                 )
-                cursor.execute("UPDATE users SET token_balance = 0.0 WHERE id = ?", (user_id,))
+                cursor.execute("UPDATE users SET token_balance = 0.0, save_balance = 0.0, give_balance = 0.0 WHERE id = ?", (user_id,))
+                cursor.execute(
+                    """
+                    INSERT INTO admin_audit_logs (admin_id, action_type, details) 
+                    VALUES ((SELECT id FROM users WHERE is_parent = 1 LIMIT 1), 'reset_ledger', ?)
+                    """,
+                    (f"Reset all balances for {user['name']} to 0 (cleared {int(round(total_to_reset))} tokens).",)
+                )
                 conn.commit()
-                msg = f"Reset balance for {user['name']} to 0."
+                msg = f"Reset all balances for {user['name']} to 0."
             else:
                 conn.rollback()
                 msg = "User not found."
@@ -632,9 +657,16 @@ async def admin_reset_user_pin(request: Request, user_id: int = Form(...), new_p
         cursor = conn.cursor()
         try:
             cursor.execute("UPDATE users SET pin_hash = ? WHERE id = ?", (hashed_pin, user_id))
-            conn.commit()
             cursor.execute("SELECT name FROM users WHERE id = ?", (user_id,))
             user = cursor.fetchone()
+            cursor.execute(
+                """
+                INSERT INTO admin_audit_logs (admin_id, action_type, details) 
+                VALUES ((SELECT id FROM users WHERE is_parent = 1 LIMIT 1), 'reset_pin', ?)
+                """,
+                (f"Reset PIN for {user['name']}.",)
+            )
+            conn.commit()
             msg = f"Reset PIN for {user['name']} successfully."
         except Exception as e:
             msg = f"Error: {str(e)}"
@@ -662,7 +694,18 @@ async def admin_rename_user(
     with get_db_connection() as conn:
         cursor = conn.cursor()
         try:
+            cursor.execute("SELECT name FROM users WHERE id = ?", (user_id,))
+            old_user = cursor.fetchone()
+            old_name = old_user["name"] if old_user else f"ID #{user_id}"
+            
             cursor.execute("UPDATE users SET name = ? WHERE id = ?", (name_stripped, user_id))
+            cursor.execute(
+                """
+                INSERT INTO admin_audit_logs (admin_id, action_type, details) 
+                VALUES ((SELECT id FROM users WHERE is_parent = 1 LIMIT 1), 'rename_profile', ?)
+                """,
+                (f"Renamed user profile '{old_name}' to '{name_stripped}'.",)
+            )
             conn.commit()
             msg = f"Renamed profile to '{name_stripped}' successfully."
             err = None
@@ -754,7 +797,7 @@ async def admin_update_chore(
 def render_dashboard(request: Request, user_id: int, cursor, message: Optional[str] = None, error: Optional[str] = None):
     """Gathers all dashboard state and returns the dashboard snippet."""
     # 1. Fetch user
-    cursor.execute("SELECT id, name, token_balance, pin_hash FROM users WHERE id = ?", (user_id,))
+    cursor.execute("SELECT id, name, token_balance, save_balance, give_balance, pin_hash FROM users WHERE id = ?", (user_id,))
     user = cursor.fetchone()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -986,7 +1029,7 @@ async def verify_ui(request: Request, name: str = Form(...), pin: str = Form(...
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, name, token_balance, pin_hash FROM users WHERE name = ?",
+            "SELECT id, name, token_balance, save_balance, give_balance, pin_hash FROM users WHERE name = ?",
             (name,)
         )
         user = cursor.fetchone()
@@ -1130,10 +1173,19 @@ async def complete_chore_ui(
                 "INSERT INTO chore_logs (chore_id, user_id, action_type, credits_delta) VALUES (?, ?, 'earn', ?)", 
                 (chore_id, user_id, chore["value_credits"])
             )
-            cursor.execute("UPDATE users SET token_balance = token_balance + ? WHERE id = ?", (chore["value_credits"], user_id))
+            # Auto-split chore credits: 50% Spend (token_balance), 30% Save, 20% Give (no decimals)
+            original_val = int(round(chore["value_credits"]))
+            give_delta = int(round(original_val * 0.20))
+            save_delta = int(round(original_val * 0.30))
+            spend_delta = original_val - give_delta - save_delta
+            
+            cursor.execute(
+                "UPDATE users SET token_balance = token_balance + ?, save_balance = save_balance + ?, give_balance = give_balance + ? WHERE id = ?",
+                (spend_delta, save_delta, give_delta, user_id)
+            )
             conn.commit()
             
-            return render_dashboard(request, user_id, cursor, message=f"Success! Earned {chore['value_credits']} credits.")
+            return render_dashboard(request, user_id, cursor, message=f"Success! Earned {original_val} credits (Auto-Split: 🎮 {spend_delta} Spend, 🛡️ {save_delta} Save, ❤️ {give_delta} Give).")
         except Exception as e:
             if conn: conn.rollback()
             return HTMLResponse(content=f"Error: {str(e)}", status_code=500)
@@ -1161,8 +1213,16 @@ async def undo_chore_ui(
             log_item = cursor.fetchone()
             
             if log_item:
-                # Deduct credits
-                cursor.execute("UPDATE users SET token_balance = token_balance - ? WHERE id = ?", (log_item["credits_delta"], user_id))
+                # Reverse auto-split: 50% Spend (token_balance), 30% Save, 20% Give (no decimals)
+                original_val = int(round(log_item["credits_delta"]))
+                give_delta = int(round(original_val * 0.20))
+                save_delta = int(round(original_val * 0.30))
+                spend_delta = original_val - give_delta - save_delta
+                
+                cursor.execute(
+                    "UPDATE users SET token_balance = token_balance - ?, save_balance = save_balance - ?, give_balance = give_balance - ? WHERE id = ?",
+                    (spend_delta, save_delta, give_delta, user_id)
+                )
                 # Mark as undo
                 cursor.execute("UPDATE chore_logs SET action_type = 'undo' WHERE id = ?", (log_id,))
                 conn.commit()
@@ -1298,15 +1358,17 @@ async def admin_award_bonus_ui(
     target_user_id: int = Form(...),
     amount: float = Form(...),
     description: str = Form(...),
-    admin_pin: str = Form(...)
+    admin_pin: str = Form(...),
+    target_jar: str = Form("split")
 ):
     """Awards a custom bonus (credits adjustment) to a user from the Admin console."""
     hashed_pin = hash_pin(admin_pin)
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT name, pin_hash FROM users WHERE is_parent = 1")
+        cursor.execute("SELECT id, name, pin_hash FROM users WHERE is_parent = 1")
         admins = cursor.fetchall()
-        valid_admin = any(hashed_pin == admin["pin_hash"] for admin in admins)
+        matched_admin = next((admin for admin in admins if hashed_pin == admin["pin_hash"]), None)
+        valid_admin = matched_admin is not None
         
         if not valid_admin:
             users, chores, transactions, google_calendars, announcements = get_admin_data(cursor)
@@ -1320,17 +1382,44 @@ async def admin_award_bonus_ui(
             })
             
         try:
+            admin_user_id = matched_admin["id"]
+            admin_name = matched_admin["name"]
+            
+            amount_val = int(round(amount))
             cursor.execute("BEGIN TRANSACTION;")
+            
+            cursor.execute("SELECT name FROM users WHERE id = ?", (target_user_id,))
+            target_user = cursor.fetchone()
+            target_user_name = target_user["name"] if target_user else f"ID #{target_user_id}"
+            
             cursor.execute(
                 "INSERT INTO token_transactions (user_id, amount, category, description) VALUES (?, ?, 'adjust', ?)",
-                (target_user_id, amount, description)
+                (target_user_id, amount_val, f"{description} [{target_jar.upper()}]")
             )
+            if target_jar == "spend":
+                cursor.execute("UPDATE users SET token_balance = token_balance + ? WHERE id = ?", (amount_val, target_user_id))
+            elif target_jar == "save":
+                cursor.execute("UPDATE users SET save_balance = save_balance + ? WHERE id = ?", (amount_val, target_user_id))
+            elif target_jar == "give":
+                cursor.execute("UPDATE users SET give_balance = give_balance + ? WHERE id = ?", (amount_val, target_user_id))
+            else:  # "split" or default
+                give_delta = int(round(amount_val * 0.20))
+                save_delta = int(round(amount_val * 0.30))
+                spend_delta = amount_val - give_delta - save_delta
+                cursor.execute(
+                    "UPDATE users SET token_balance = token_balance + ?, save_balance = save_balance + ?, give_balance = give_balance + ? WHERE id = ?",
+                    (spend_delta, save_delta, give_delta, target_user_id)
+                )
+                
+            action_desc = "awarded" if amount_val >= 0 else "deducted"
+            abs_amount = abs(amount_val)
             cursor.execute(
-                "UPDATE users SET token_balance = token_balance + ? WHERE id = ?",
-                (amount, target_user_id)
+                "INSERT INTO admin_audit_logs (admin_id, action_type, details) VALUES (?, 'bonus', ?)",
+                (admin_user_id, f"{action_desc.capitalize()} {abs_amount} tokens to/from {target_user_name} ({target_jar.upper()}) - Reason: {description}")
             )
+            
             conn.commit()
-            msg = f"Successfully awarded 🪙 {amount} to user."
+            msg = f"Successfully awarded 🪙 {amount_val} to user ({target_jar.upper()})." if amount_val >= 0 else f"Successfully deducted 🪙 {abs_amount} from user ({target_jar.upper()})."
             err = None
         except Exception as e:
             conn.rollback()
@@ -1561,7 +1650,7 @@ def verify_user(request: VerifyRequest):
     hashed_input = hash_pin(request.pin)
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, token_balance, pin_hash FROM users WHERE name = ?", (request.name,))
+        cursor.execute("SELECT id, name, token_balance, save_balance, give_balance, pin_hash FROM users WHERE name = ?", (request.name,))
         user = cursor.fetchone()
         if not user or user["pin_hash"] != hashed_input:
             raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -1587,7 +1676,16 @@ def complete_chore(request: ChoreCompleteRequest):
                 "INSERT INTO chore_logs (chore_id, user_id, action_type, credits_delta) VALUES (?, ?, 'earn', ?)", 
                 (request.chore_id, request.user_id, chore["value_credits"])
             )
-            cursor.execute("UPDATE users SET token_balance = token_balance + ? WHERE id = ?", (chore["value_credits"], request.user_id))
+            # Auto-split chore credits: 50% Spend (token_balance), 30% Save, 20% Give (no decimals)
+            original_val = int(round(chore["value_credits"]))
+            give_delta = int(round(original_val * 0.20))
+            save_delta = int(round(original_val * 0.30))
+            spend_delta = original_val - give_delta - save_delta
+            
+            cursor.execute(
+                "UPDATE users SET token_balance = token_balance + ?, save_balance = save_balance + ?, give_balance = give_balance + ? WHERE id = ?",
+                (spend_delta, save_delta, give_delta, request.user_id)
+            )
             conn.commit()
             cursor.execute("SELECT token_balance FROM users WHERE id = ?", (request.user_id,))
             return {"status": "success", "new_balance": cursor.fetchone()["token_balance"]}
@@ -1996,7 +2094,7 @@ async def redeem_reward_ui(
     
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, pin_hash, token_balance FROM users WHERE id = ?", (user_id,))
+        cursor.execute("SELECT id, pin_hash, token_balance, save_balance, give_balance FROM users WHERE id = ?", (user_id,))
         user = cursor.fetchone()
         
         if not user:
@@ -2005,24 +2103,57 @@ async def redeem_reward_ui(
         if not pin or hash_pin(pin) != user["pin_hash"]:
              return HTMLResponse(content='<div class="alert alert-error">Invalid PIN.</div>', status_code=401)
             
-        cursor.execute("SELECT id, title, cost_points FROM rewards WHERE id = ? AND is_active = 1", (reward_id,))
+        cursor.execute("SELECT id, title, cost_points, target_jar FROM rewards WHERE id = ? AND is_active = 1", (reward_id,))
         reward = cursor.fetchone()
         if not reward:
             return HTMLResponse(content='<div class="alert alert-error">Reward not found.</div>', status_code=404)
             
-        if user["token_balance"] < reward["cost_points"]:
-            return HTMLResponse(content='<div class="alert alert-error">Insufficient tokens.</div>', status_code=400)
+        target_jar = reward["target_jar"]
+        if target_jar == "spend":
+            user_balance = user["token_balance"]
+            balance_column = "token_balance"
+        elif target_jar == "save":
+            user_balance = user["save_balance"]
+            balance_column = "save_balance"
+        elif target_jar == "give":
+            user_balance = user["give_balance"]
+            balance_column = "give_balance"
+        else:
+            return HTMLResponse(content='<div class="alert alert-error">Invalid target jar.</div>', status_code=400)
+            
+        if user_balance < reward["cost_points"]:
+            return HTMLResponse(content='<div class="alert alert-error">Insufficient tokens in targeted jar.</div>', status_code=400)
             
         try:
             cursor.execute("BEGIN TRANSACTION;")
-            cursor.execute("UPDATE users SET token_balance = token_balance - ? WHERE id = ?", (reward["cost_points"], user_id))
+            # Deduct points from the appropriate balance column
+            cursor.execute(f"UPDATE users SET {balance_column} = {balance_column} - ? WHERE id = ?", (reward["cost_points"], user_id))
+            
+            # Record a token transaction log for record-keeping
             cursor.execute(
                 "INSERT INTO token_transactions (user_id, amount, category, description) VALUES (?, ?, 'spend', ?)",
                 (user_id, -reward["cost_points"], f"Redeemed: {reward['title']}")
             )
-            conn.commit()
             
-            msg = f"Redeemed {reward['title']} for {reward['cost_points']} credits!"
+            # If target_jar is 'save' or 'give', also create a pending payout request!
+            if target_jar in ("save", "give"):
+                cash_val = reward["cost_points"] / 100.0
+                payout_type = "cash" if target_jar == "save" else "charity"
+                if "excursion" in reward["title"].lower() or "run" in reward["title"].lower() or "passenger" in reward["title"].lower():
+                    payout_type = "outing"
+                
+                cursor.execute(
+                    """
+                    INSERT INTO payout_requests (user_id, reward_id, amount_tokens, cash_value, payout_type, status)
+                    VALUES (?, ?, ?, ?, ?, 'pending')
+                    """,
+                    (user_id, reward["id"], reward["cost_points"], cash_val, payout_type)
+                )
+                msg = f"Request submitted! Pending parent approval for: {reward['title']} (Jar: {target_jar.upper()})"
+            else:
+                msg = f"Redeemed {reward['title']} for {reward['cost_points']} credits!"
+                
+            conn.commit()
             return render_dashboard(request, user_id, cursor, message=msg)
         except Exception as e:
             conn.rollback()
@@ -2043,27 +2174,56 @@ def redeem_reward(request: RedeemRequest):
     hashed_input = hash_pin(request.pin)
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT pin_hash, token_balance FROM users WHERE id = ?", (request.user_id,))
+        cursor.execute("SELECT pin_hash, token_balance, save_balance, give_balance FROM users WHERE id = ?", (request.user_id,))
         user = cursor.fetchone()
         if not user or user["pin_hash"] != hashed_input:
             raise HTTPException(status_code=401, detail="Invalid PIN")
             
-        cursor.execute("SELECT title, cost_points FROM rewards WHERE id = ? AND is_active = 1", (request.reward_id,))
+        cursor.execute("SELECT id, title, cost_points, target_jar FROM rewards WHERE id = ? AND is_active = 1", (request.reward_id,))
         reward = cursor.fetchone()
         if not reward:
             raise HTTPException(status_code=404, detail="Reward not found")
             
-        if user["token_balance"] < reward["cost_points"]:
+        target_jar = reward["target_jar"]
+        if target_jar == "spend":
+            user_balance = user["token_balance"]
+            balance_column = "token_balance"
+        elif target_jar == "save":
+            user_balance = user["save_balance"]
+            balance_column = "save_balance"
+        elif target_jar == "give":
+            user_balance = user["give_balance"]
+            balance_column = "give_balance"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid target jar")
+            
+        if user_balance < reward["cost_points"]:
             raise HTTPException(status_code=400, detail="Insufficient tokens")
             
         try:
             cursor.execute("BEGIN TRANSACTION;")
-            cursor.execute("UPDATE users SET token_balance = token_balance - ? WHERE id = ?", (reward["cost_points"], request.user_id))
+            cursor.execute(f"UPDATE users SET {balance_column} = {balance_column} - ? WHERE id = ?", (reward["cost_points"], request.user_id))
             cursor.execute(
                 "INSERT INTO token_transactions (user_id, amount, category, description) VALUES (?, ?, 'spend', ?)",
                 (request.user_id, -reward["cost_points"], f"Redeemed: {reward['title']}")
             )
             tx_id = cursor.lastrowid
+            
+            # If target_jar is 'save' or 'give', also create a pending payout request!
+            if target_jar in ("save", "give"):
+                cash_val = reward["cost_points"] / 100.0
+                payout_type = "cash" if target_jar == "save" else "charity"
+                if "excursion" in reward["title"].lower() or "run" in reward["title"].lower() or "passenger" in reward["title"].lower():
+                    payout_type = "outing"
+                
+                cursor.execute(
+                    """
+                    INSERT INTO payout_requests (user_id, reward_id, amount_tokens, cash_value, payout_type, status)
+                    VALUES (?, ?, ?, ?, ?, 'pending')
+                    """,
+                    (request.user_id, reward["id"], reward["cost_points"], cash_val, payout_type)
+                )
+                
             conn.commit()
             
             cursor.execute("SELECT token_balance FROM users WHERE id = ?", (request.user_id,))
@@ -2101,7 +2261,8 @@ async def admin_update_reward(
     title: str = Form(...),
     description: Optional[str] = Form(None),
     tier: int = Form(...),
-    cost_points: float = Form(...)
+    cost_points: float = Form(...),
+    target_jar: str = Form("spend")
 ):
     """Updates a reward's details from the admin panel."""
     with get_db_connection() as conn:
@@ -2110,10 +2271,10 @@ async def admin_update_reward(
             cursor.execute(
                 """
                 UPDATE rewards 
-                SET title = ?, description = ?, tier = ?, cost_points = ?
+                SET title = ?, description = ?, tier = ?, cost_points = ?, target_jar = ?
                 WHERE id = ?
                 """,
-                (title, description, tier, cost_points, reward_id)
+                (title, description, tier, cost_points, target_jar, reward_id)
             )
             conn.commit()
             msg = f"Updated reward: {title}"
@@ -2121,6 +2282,168 @@ async def admin_update_reward(
         except Exception as e:
             msg = None
             err = f"Error: {str(e)}"
+            
+        users, chores, transactions, google_calendars, announcements = get_admin_data(cursor)
+        return templates.TemplateResponse(request, "admin_snippet.html", {
+            "users": users,
+            "chores": chores,
+            "transactions": transactions,
+            "google_calendars": google_calendars,
+            "announcements": announcements,
+            "message": msg,
+            "error": err
+        })
+
+@app.post("/api/admin/payouts/approve", response_class=HTMLResponse)
+async def admin_approve_payout(
+    request: Request,
+    request_id: int = Form(...),
+    admin_pin: str = Form(...)
+):
+    """Approves a pending Save/Give payout/donation request."""
+    hashed_pin = hash_pin(admin_pin)
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, pin_hash FROM users WHERE is_parent = 1")
+        admins = cursor.fetchall()
+        valid_admin = any(hashed_pin == admin["pin_hash"] for admin in admins)
+        
+        if not valid_admin:
+            users, chores, transactions, google_calendars, announcements = get_admin_data(cursor)
+            return templates.TemplateResponse(request, "admin_snippet.html", {
+                "users": users,
+                "chores": chores,
+                "transactions": transactions,
+                "google_calendars": google_calendars,
+                "announcements": announcements,
+                "error": "Invalid Admin PIN. Approval aborted."
+            })
+            
+        try:
+            cursor.execute("BEGIN TRANSACTION;")
+            # Fetch request details
+            cursor.execute("SELECT user_id, amount_tokens, payout_type, status FROM payout_requests WHERE id = ?", (request_id,))
+            req = cursor.fetchone()
+            
+            if not req:
+                raise Exception("Request not found.")
+            if req["status"] != "pending":
+                raise Exception("Request is already resolved.")
+                
+            # Mark request as approved/paid
+            import datetime
+            cursor.execute(
+                "UPDATE payout_requests SET status = 'paid', resolved_at = ? WHERE id = ?",
+                (datetime.datetime.now().isoformat(), request_id)
+            )
+            
+            # Log admin audit log
+            cursor.execute("SELECT id FROM users WHERE is_parent = 1 LIMIT 1")
+            admin_user = cursor.fetchone()
+            admin_id = admin_user["id"] if admin_user else 1
+            
+            cursor.execute(
+                "INSERT INTO admin_audit_logs (admin_id, action_type, details) VALUES (?, 'approve_payout', ?)",
+                (admin_id, f"Approved request #{request_id} for user_id {req['user_id']} ({req['amount_tokens']} tokens)")
+            )
+            
+            conn.commit()
+            msg = f"Successfully approved and marked request #{request_id} as paid."
+            err = None
+        except Exception as e:
+            conn.rollback()
+            msg = None
+            err = f"Error approving request: {str(e)}"
+            
+        users, chores, transactions, google_calendars, announcements = get_admin_data(cursor)
+        return templates.TemplateResponse(request, "admin_snippet.html", {
+            "users": users,
+            "chores": chores,
+            "transactions": transactions,
+            "google_calendars": google_calendars,
+            "announcements": announcements,
+            "message": msg,
+            "error": err
+        })
+
+@app.post("/api/admin/payouts/decline", response_class=HTMLResponse)
+async def admin_decline_payout(
+    request: Request,
+    request_id: int = Form(...),
+    admin_pin: str = Form(...)
+):
+    """Declines a pending Save/Give payout/donation request and refunds the points."""
+    hashed_pin = hash_pin(admin_pin)
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, pin_hash FROM users WHERE is_parent = 1")
+        admins = cursor.fetchall()
+        valid_admin = any(hashed_pin == admin["pin_hash"] for admin in admins)
+        
+        if not valid_admin:
+            users, chores, transactions, google_calendars, announcements = get_admin_data(cursor)
+            return templates.TemplateResponse(request, "admin_snippet.html", {
+                "users": users,
+                "chores": chores,
+                "transactions": transactions,
+                "google_calendars": google_calendars,
+                "announcements": announcements,
+                "error": "Invalid Admin PIN. Rejection aborted."
+            })
+            
+        try:
+            cursor.execute("BEGIN TRANSACTION;")
+            # Fetch request details
+            cursor.execute("SELECT user_id, amount_tokens, payout_type, status FROM payout_requests WHERE id = ?", (request_id,))
+            req = cursor.fetchone()
+            
+            if not req:
+                raise Exception("Request not found.")
+            if req["status"] != "pending":
+                raise Exception("Request is already resolved.")
+                
+            # Refund points to the correct jar
+            payout_type = req["payout_type"]
+            if payout_type == "charity":
+                balance_column = "give_balance"
+            else:
+                balance_column = "save_balance"
+                
+            cursor.execute(
+                f"UPDATE users SET {balance_column} = {balance_column} + ? WHERE id = ?",
+                (req["amount_tokens"], req["user_id"])
+            )
+            
+            # Record refund transaction
+            cursor.execute(
+                "INSERT INTO token_transactions (user_id, amount, category, description) VALUES (?, ?, 'adjust', ?)",
+                (req["user_id"], req["amount_tokens"], f"Refund: Declined request #{request_id}")
+            )
+            
+            # Mark request as declined
+            import datetime
+            cursor.execute(
+                "UPDATE payout_requests SET status = 'declined', resolved_at = ? WHERE id = ?",
+                (datetime.datetime.now().isoformat(), request_id)
+            )
+            
+            # Log admin audit log
+            cursor.execute("SELECT id FROM users WHERE is_parent = 1 LIMIT 1")
+            admin_user = cursor.fetchone()
+            admin_id = admin_user["id"] if admin_user else 1
+            
+            cursor.execute(
+                "INSERT INTO admin_audit_logs (admin_id, action_type, details) VALUES (?, 'decline_payout', ?)",
+                (admin_id, f"Declined request #{request_id} for user_id {req['user_id']} ({req['amount_tokens']} tokens refunded)")
+            )
+            
+            conn.commit()
+            msg = f"Declined request #{request_id} and refunded {req['amount_tokens']} tokens to user's jar."
+            err = None
+        except Exception as e:
+            conn.rollback()
+            msg = None
+            err = f"Error declining request: {str(e)}"
             
         users, chores, transactions, google_calendars, announcements = get_admin_data(cursor)
         return templates.TemplateResponse(request, "admin_snippet.html", {
