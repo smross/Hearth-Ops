@@ -31,7 +31,7 @@ This file tracks the active deployment state of the HearthOps monorepo. Use this
 
 ## 🟩 Phase 6: Production Hardening & Feature Expansion (Next)
 - [x] **Task 6.1:** Implement "Token Redemptions" (Rewards store) for kids to spend their earned credits.
-- [ ] **Task 6.2:** Configure Pi-hole API hooks to toggle internet access based on chore completion status.
+- [ ] Task 6.2 (Deferred): Configure Pi-hole API hooks to toggle internet access based on chore completion status.
 - [x] **Task 6.3:** Add "Transaction History" view for kids to see their past earned/spent tokens.
 
 ## 🟩 Phase 7: Family Announcements Feature
